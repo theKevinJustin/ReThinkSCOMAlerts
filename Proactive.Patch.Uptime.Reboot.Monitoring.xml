@@ -1,0 +1,2114 @@
+<?xml version="1.0" encoding="utf-8"?><ManagementPack ContentReadable="true" SchemaVersion="2.0" OriginalSchemaVersion="2.0" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+  <Manifest>
+    <Identity>
+      <ID>Proactive.Patch.Uptime.Reboot.Monitoring</ID>
+      <Version>10.19.10407.3</Version>
+    </Identity>
+    <Name>Proactive Patch Uptime Reboot Monitoring</Name>
+	<References>
+      <Reference Alias="Health">
+        <ID>System.Health.Library</ID>
+        <Version>7.0.8433.0</Version>
+        <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
+      </Reference>
+      <Reference Alias="SC">
+        <ID>Microsoft.SystemCenter.Library</ID>
+        <Version>7.0.8433.0</Version>
+        <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
+      </Reference>
+      <Reference Alias="System">
+        <ID>System.Library</ID>
+        <Version>7.5.8501.0</Version>
+        <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
+      </Reference>
+      <Reference Alias="Windows">
+        <ID>Microsoft.Windows.Library</ID>
+        <Version>7.5.8501.0</Version>
+        <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
+      </Reference>
+    </References>
+  </Manifest>
+  <TypeDefinitions>
+    <ModuleTypes>
+      <DataSourceModuleType ID="Server.Pending.Restart.Monitor.DataSource" Accessibility="Internal" Batching="false">
+        <Configuration>
+          <xsd:element minOccurs="1" type="xsd:integer" name="IntervalSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="0" type="xsd:string" name="SyncTime" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:integer" name="TimeoutSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+		  <xsd:element minOccurs="1" type="xsd:string" name="ComputerName" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:boolean" name="SCCMCheck" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:boolean" name="FileRenameCheck" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:boolean" name="ComBSCheck" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:boolean" name="ComRNDJCheck" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:boolean" name="WinUAUCheck" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+        </Configuration>
+        <OverrideableParameters>
+          <OverrideableParameter ID="IntervalSeconds" Selector="$Config/IntervalSeconds$" ParameterType="int" />
+          <OverrideableParameter ID="SyncTime" Selector="$Config/SyncTime$" ParameterType="string" />
+          <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />
+          <OverrideableParameter ID="SCCMCheck" Selector="$Config/SCCMCheck$" ParameterType="bool" />
+          <OverrideableParameter ID="FileRenameCheck" Selector="$Config/FileRenameCheck$" ParameterType="bool" />
+          <OverrideableParameter ID="ComBSCheck" Selector="$Config/ComBSCheck$" ParameterType="bool" />
+          <OverrideableParameter ID="ComRNDJCheck" Selector="$Config/ComRNDJCheck$" ParameterType="bool" />
+          <OverrideableParameter ID="WinUAUCheck" Selector="$Config/WinUAUCheck$" ParameterType="bool" />
+        </OverrideableParameters>
+        <ModuleImplementation Isolation="Any">
+          <Composite>
+            <MemberModules>
+              <DataSource ID="Scheduler" TypeID="System!System.Scheduler">
+                <Scheduler>
+                  <SimpleReccuringSchedule>
+                    <Interval Unit="Seconds">$Config/IntervalSeconds$</Interval>
+                    <SyncTime>$Config/SyncTime$</SyncTime>
+                  </SimpleReccuringSchedule>
+                  <ExcludeDates />
+                </Scheduler>
+              </DataSource>
+              <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
+                <ScriptName>Server.Pending.Restart.Monitor.DataSource.ps1</ScriptName>
+                <ScriptBody>
+                  #=================================================================================
+                  #  Describe Script Here
+                  #
+                  #  Author:
+                  #  v1.0
+                  #=================================================================================
+                  param([String]$FileRenameCheck,[String]$SCCMCheck,[String]$ComBSCheck,[String]$ComRNDJCheck,[String]$WinUAUCheck)
+
+                  $FileN = [System.Convert]::ToBoolean($FileRenameCheck)
+
+                  $CM = [System.Convert]::ToBoolean($SCCMCheck)
+
+                  $CBS = [System.Convert]::ToBoolean($ComBSCheck)
+
+                  $RNDJ = [System.Convert]::ToBoolean($ComRNDJCheck)
+
+                  $WUAU = [System.Convert]::ToBoolean($WinUAUCheck)
+
+
+                  # Constants section - modify stuff here:
+                  #=================================================================================
+                  # Assign script name variable for use in event logging.
+                  $ScriptName = "Server.Pending.Restart.Monitor.DataSource.ps1"
+                  $EventID = "560"
+                  #=================================================================================
+                  # Starting Script section - All scripts get this
+                  #=================================================================================
+                  # Gather the start time of the script
+                  $StartTime = Get-Date
+                  #Set variable to be used in logging events
+                  $whoami = whoami
+                  # Load MOMScript API
+                  $momapi = New-Object -comObject MOM.ScriptAPI
+                  # Load PropertyBag function
+                  $bag = $momapi.CreatePropertyBag()
+                  #Log script event that we are starting task
+                  $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script is starting. `n Running as ($whoami).")
+
+                  #=================================================================================
+                  # Begin MAIN script section
+                  #=================================================================================
+
+                  $invokeWmiMethodParameters = @{
+                  Namespace    = 'root/default'
+                  Class        = 'StdRegProv'
+                  Name         = 'EnumKey'
+                  ComputerName = $env:COMPUTERNAME
+                  ErrorAction  = 'Stop'
+                  }
+
+                  $hklm = [UInt32] "0x80000002"
+
+                  if ($CBS -eq $true)
+                  {
+                  ## Query the Component Based Servicing Reg Key
+                  $invokeWmiMethodParameters.ArgumentList = @($hklm, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\')
+                  $registryComponentBasedServicing = (Invoke-WmiMethod @invokeWmiMethodParameters).sNames -contains 'RebootPending'
+                  }
+
+                  if ($WUAU -eq $true)
+                  {
+                  ## Query WUAU from the registry
+                  $invokeWmiMethodParameters.ArgumentList = @($hklm, 'SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\')
+                  $registryWindowsUpdateAutoUpdate = (Invoke-WmiMethod @invokeWmiMethodParameters).sNames -contains 'RebootRequired'
+                  }
+
+                  if ($RNDJ -eq $true)
+                  {
+
+                  ## Query JoinDomain key from the registry - These keys are present if pending a reboot from a domain join operation
+                  $invokeWmiMethodParameters.ArgumentList = @($hklm, 'SYSTEM\CurrentControlSet\Services\Netlogon')
+                  $registryNetlogon = (Invoke-WmiMethod @invokeWmiMethodParameters).sNames
+                  $pendingDomainJoin = ($registryNetlogon -contains 'JoinDomain') -or ($registryNetlogon -contains 'AvoidSpnSet')
+
+                  ## Query ComputerName and ActiveComputerName from the registry and setting the MethodName to GetMultiStringValue
+                  $invokeWmiMethodParameters.Name = 'GetMultiStringValue'
+                  $invokeWmiMethodParameters.ArgumentList = @($hklm, 'SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName\', 'ComputerName')
+                  $registryActiveComputerName = Invoke-WmiMethod @invokeWmiMethodParameters
+
+                  $invokeWmiMethodParameters.ArgumentList = @($hklm, 'SYSTEM\CurrentControlSet\Control\ComputerName\ComputerName\', 'ComputerName')
+                  $registryComputerName = Invoke-WmiMethod @invokeWmiMethodParameters
+
+                  $pendingComputerRename = $registryActiveComputerName -ne $registryComputerName -or $pendingDomainJoin
+                  }
+
+                  ## Query PendingFileRenameOperations from the registry
+                  if ($FileN -eq $true)
+                  {
+                  $invokeWmiMethodParameters.ArgumentList = @($hklm, 'SYSTEM\CurrentControlSet\Control\Session Manager\', 'PendingFileRenameOperations')
+                  [string]$registryPendingFileRenameOperations = (Invoke-WmiMethod @invokeWmiMethodParameters).sValue
+                  $registryPendingFileRenameOperationsBool = [bool]$registryPendingFileRenameOperations
+                  }
+
+                  ## Query ClientSDK for pending reboot status, unless SkipConfigurationManagerClientCheck is present
+                  if ($CM -eq $true)
+                  {
+                  $invokeWmiMethodParameters.NameSpace = 'ROOT\ccm\ClientSDK'
+                  $invokeWmiMethodParameters.Class = 'CCM_ClientUtilities'
+                  $invokeWmiMethodParameters.Name = 'DetermineifRebootPending'
+                  $invokeWmiMethodParameters.Remove('ArgumentList')
+
+                  try
+                  {
+                  $sccmClientSDK = Invoke-WmiMethod @invokeWmiMethodParameters
+                  $systemCenterConfigManager = $sccmClientSDK.ReturnValue -eq 0 -and ($sccmClientSDK.IsHardRebootPending -or $sccmClientSDK.RebootPending)
+                  }
+                  catch
+                  {
+                  $systemCenterConfigManager = "No SCCM Agent present on this computer"
+                  Write-Verbose -Message ($script:localizedData.invokeWmiClientSDKError -f $computer)
+                  }
+                  }
+
+                  # Querying for last reboot
+                  $lastreboot = Get-WmiObject win32_operatingsystem -ComputerName $env:computername | select csname, @{LABEL='LastBootUpTime';EXPRESSION={$_.ConverttoDateTime($_.lastbootuptime)}}
+
+                  $isRebootPending = $registryComponentBasedServicing -or `
+                  $pendingComputerRename -or `
+                  $pendingDomainJoin -or `
+                  $registryPendingFileRenameOperationsBool -or `
+                  $(if ([string]$systemCenterConfigManager -eq "True"){$systemCenterConfigManager}) -or `
+                  $registryWindowsUpdateAutoUpdate
+
+                  $Result =  [PSCustomObject]@{
+                  ComputerName                     = $computer
+                  ComponentBasedServicing          = $(if ([string]::IsNullOrWhiteSpace($registryComponentBasedServicing)) {"Monitoring not enabled for this condition"} else {$registryComponentBasedServicing})
+                  PendingComputerRenameDomainJoin  = $(if ([string]::IsNullOrWhiteSpace($pendingComputerRename)) {"Monitoring not enabled for this condition"} else {$pendingComputerRename})
+                  PendingFileRenameOperations      = $(if ([string]::IsNullOrWhiteSpace($registryPendingFileRenameOperationsBool)) {"Monitoring not enabled for this condition"} else {$registryPendingFileRenameOperationsBool})
+                  PendingFileRenameOperationsValue = $registryPendingFileRenameOperations
+                  SystemCenterConfigManager        = $(if ([string]::IsNullOrWhiteSpace($systemCenterConfigManager)) {"Monitoring not enabled for this condition"} else {$systemCenterConfigManager})
+                  WindowsUpdateAutoUpdate          = $(if ([string]::IsNullOrWhiteSpace($registryWindowsUpdateAutoUpdate)) {"Monitoring not enabled for this condition"} else {$registryWindowsUpdateAutoUpdate})
+                  IsRebootPending                  = $isRebootPending
+                  LastBootUpTime                   = $lastreboot.LastBootUpTime
+                  }
+
+                  IF ($Result.IsRebootPending -eq $True)
+                  {
+                  $RestartPending = "YES"
+                  }
+                  ELSE
+                  {
+                  $RestartPending = "NO"
+                  }
+
+                  #Check the value of RebootPending
+                  IF ($RestartPending -eq "NO")
+                  {
+                  $momapi.LogScriptEvent($ScriptName,$EventID,0, "`No restart pending detected")
+                  $bag.AddValue("RestartPending", 'NoRestartPending')
+                  }
+                  ELSE
+                  {
+                  $momapi.LogScriptEvent($ScriptName,$EventID,0, "`Restart pending detected. `Details = ($Result)")
+                  $bag.AddValue("RestartPending", 'RestartPending')
+                  $bag.AddValue("ComponentBasedServicing", $Result.ComponentBasedServicing)
+                  $bag.AddValue("PendingComputerRenameDomainJoin", $Result.PendingComputerRenameDomainJoin)
+                  $bag.AddValue("PendingFileRenameOperations", $Result.PendingFileRenameOperations)
+                  $bag.AddValue("PendingFileRenameOperationsValue", $Result.PendingFileRenameOperationsValue)
+                  $bag.AddValue("SystemCenterConfigManager", $Result.SystemCenterConfigManager)
+                  $bag.AddValue("WindowsUpdateAutoUpdate", $Result.WindowsUpdateAutoUpdate)
+                  $bag.AddValue("LastBootUpTime", $Result.LastBootUpTime)
+                  }
+
+                  # Return all bags
+                  $bag
+
+                  # End of script section
+                  #=================================================================================
+                  #Log an event for script ending and total execution time.
+                  $EndTime = Get-Date
+                  $ScriptTime = ($EndTime - $StartTime).TotalSeconds
+                  $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+                  #=================================================================================
+                  # End of script
+
+                </ScriptBody>
+                <Parameters>
+                  <Parameter>
+                    <Name>ComputerName</Name>
+                    <Value>$Config/ComputerName$</Value>									
+                  </Parameter>
+                  <Parameter>
+                    <Name>SCCMCheck</Name>
+                    <Value>$Config/SCCMCheck$</Value>
+                  </Parameter>
+                  <Parameter>
+                    <Name>FileRenameCheck</Name>
+                    <Value>$Config/FileRenameCheck$</Value>
+                  </Parameter>
+                  <Parameter>
+                    <Name>ComBSCheck</Name>
+                    <Value>$Config/ComBSCheck$</Value>
+                  </Parameter>
+                  <Parameter>
+                    <Name>ComRNDJCheck</Name>
+                    <Value>$Config/ComRNDJCheck$</Value>
+                  </Parameter>
+                  <Parameter>
+                    <Name>WinUAUCheck</Name>
+                    <Value>$Config/WinUAUCheck$</Value>
+                  </Parameter>
+                </Parameters>
+                <TimeoutSeconds>300</TimeoutSeconds>
+              </ProbeAction>
+            </MemberModules>
+            <Composition>
+              <Node ID="PA">
+                <Node ID="Scheduler" />
+              </Node>
+            </Composition>
+          </Composite>
+        </ModuleImplementation>
+        <OutputType>System!System.PropertyBagData</OutputType>
+      </DataSourceModuleType>
+      <DataSourceModuleType ID="Server.Last.Patch.Applied.Monitor.DS" Accessibility="Internal" Batching="false">
+        <Configuration>
+		  <xsd:element minOccurs="1" type="xsd:integer" name="IntervalSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+		  <xsd:element minOccurs="0" type="xsd:string" name="SyncTime" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+		  <xsd:element minOccurs="1" type="xsd:integer" name="NumberOfDays" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+		  <xsd:element minOccurs="1" type="xsd:string" name="ComputerName" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />		  
+		  <xsd:element minOccurs="1" type="xsd:integer" name="TimeoutSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />	
+        </Configuration>
+        <OverrideableParameters>
+		  <OverrideableParameter ID="IntervalSeconds" Selector="$Config/IntervalSeconds$" ParameterType="int" />
+		  <OverrideableParameter ID="SyncTime" Selector="$Config/SyncTime$" ParameterType="string" />
+		  <OverrideableParameter ID="NumberOfDays" Selector="$Config/NumberOfDays$" ParameterType="int" />
+		  <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />
+        </OverrideableParameters>
+        <ModuleImplementation Isolation="Any">
+          <Composite>
+            <MemberModules>
+              <DataSource ID="Scheduler" TypeID="System!System.Scheduler">
+                <Scheduler>
+                  <SimpleReccuringSchedule>
+                    <Interval Unit="Seconds">$Config/IntervalSeconds$</Interval>
+					<SyncTime>$Config/SyncTime$</SyncTime>
+                  </SimpleReccuringSchedule>
+                  <ExcludeDates />
+                </Scheduler>
+              </DataSource>
+              <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
+                <ScriptName>Server.Last.Patch.Applied.Monitor.DS.ps1</ScriptName>
+                <ScriptBody>
+#=================================================================================
+#  PowerShell script to calculate last patch applied is over x days old
+#  x days old is controlled by $NumberOfDays variable.
+#
+#  Author:  Kevin Justin
+#  v1.0
+#=================================================================================
+param([int]$NumberOfDays)
+
+
+# Manual Testing section - put stuff here for manually testing script - typically parameters:
+#=================================================================================
+# $NumberOfDays = "45"
+#=================================================================================
+
+
+# Constants section - modify stuff here:
+#=================================================================================
+# Assign script name variable for use in event logging.  
+$ScriptName = "Server.Last.Patch.Applied.Monitor.DS.ps1"
+$EventID = "561"
+#=================================================================================
+
+
+# Starting Script section - All scripts get this
+#=================================================================================
+# Gather the start time of the script
+$StartTime = Get-Date
+#Set variable to be used in logging events
+$whoami = whoami
+# Load MOMScript API
+$momapi = New-Object -comObject MOM.ScriptAPI
+# Load PropertyBag function 
+$bag = $momapi.CreatePropertyBag()
+#Log script event that we are starting task
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script is starting. `n Running as ($whoami).")
+#=================================================================================
+
+
+# Begin MAIN script section
+#=================================================================================
+#Log script parameters we received
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"`nScript parameters passed into datasource: `nNumberOfDays: ($NumberOfDays).")
+
+#Set the condition = bad.  This represents your script finding something wrong
+
+#
+# Figure out last patch
+$Patches = get-hotfix | sort installedon -Descending
+ 
+# Log latest patch installed
+$Patches | where installedon -eq $Patches[0].InstalledOn 
+ 
+# Figure out days since last patch installed
+$TimeSpan = [DateTime](Get-Date) - [DateTime]$Patches[0].InstalledOn
+ 
+$TimeSpan.Days
+$Days = $TimeSpan.Days
+  
+# Test if days greater than $NumberOfDays
+if ( $TimeSpan.Days -ge $NumberOfDays)
+	{
+	Write-host -f yellow "Greater than ($NumberOfDays)"
+	$strCondition = "Bad"
+	$Message = "Server Last Patched more than ($NumberOfDays) days ago.`n `nExamine server for working SCCM client"
+	}
+if ( $TimeSpan.Days -lt $NumberOfDays)
+	{
+	$strCondition = "Good"
+	$Message = "Server Last patched ($Days) days ago."
+	}
+
+#Check the value of $strCondition
+IF ($strCondition -eq "Good")
+{
+  $strCondition
+  $momapi.LogScriptEvent($ScriptName,$EventID,0,"`nServer last patched ($Days) days ago.")
+  $bag.AddValue('Result','GoodCondition')
+  $bag.AddValue('Message',$Message)
+}
+ELSE
+{
+  $strCondition
+  $momapi.LogScriptEvent($ScriptName,$EventID,0,"`nServer last patched more than ($NumberOfDays) days ago.`n `nExamine server for working SCCM client")
+  $bag.AddValue('Result','BadCondition')
+  $bag.AddValue('Message',$Message)
+}
+
+# Return all bags
+$bag
+#=================================================================================
+# End MAIN script section
+
+
+# End of script section
+#=================================================================================
+#Log an event for script ending and total execution time.
+$EndTime = Get-Date
+$ScriptTime = ($EndTime - $StartTime).TotalSeconds
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+#=================================================================================
+# End of script
+                </ScriptBody>
+                <Parameters>
+                  <Parameter>
+                    <Name>NumberOfDays</Name>
+                    <Value>$Config/NumberOfDays$</Value>									
+                  </Parameter>
+                  <Parameter>
+                    <Name>ComputerName</Name>
+                    <Value>$Config/ComputerName$</Value>									
+                  </Parameter>
+                </Parameters>				  
+                <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
+              </ProbeAction>
+            </MemberModules>
+            <Composition>
+              <Node ID="PA">
+                <Node ID="Scheduler" />
+              </Node>
+            </Composition>
+          </Composite>
+        </ModuleImplementation>
+        <OutputType>System!System.PropertyBagData</OutputType>
+      </DataSourceModuleType>
+      <DataSourceModuleType ID="Server.Uptime.Monitor.DS" Accessibility="Internal" Batching="false">
+        <Configuration>
+		  <xsd:element minOccurs="1" type="xsd:integer" name="IntervalSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+		  <xsd:element minOccurs="0" type="xsd:string" name="SyncTime" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+		  <xsd:element minOccurs="1" type="xsd:integer" name="NumberOfDays" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+		  <xsd:element minOccurs="1" type="xsd:string" name="ComputerName" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+		  <xsd:element minOccurs="1" type="xsd:integer" name="TimeoutSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />	
+        </Configuration>
+        <OverrideableParameters>
+		  <OverrideableParameter ID="IntervalSeconds" Selector="$Config/IntervalSeconds$" ParameterType="int" />
+		  <OverrideableParameter ID="SyncTime" Selector="$Config/SyncTime$" ParameterType="string" />
+		  <OverrideableParameter ID="NumberOfDays" Selector="$Config/NumberOfDays$" ParameterType="int" />
+		  <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />
+        </OverrideableParameters>
+        <ModuleImplementation Isolation="Any">
+          <Composite>
+            <MemberModules>
+              <DataSource ID="Scheduler" TypeID="System!System.Scheduler">
+                <Scheduler>
+                  <SimpleReccuringSchedule>
+                    <Interval Unit="Seconds">$Config/IntervalSeconds$</Interval>
+					<SyncTime>$Config/SyncTime$</SyncTime>
+                  </SimpleReccuringSchedule>
+                  <ExcludeDates />
+                </Scheduler>
+              </DataSource>
+              <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
+                <ScriptName>Server.Uptime.Monitor.DS.ps1</ScriptName>
+                <ScriptBody>
+#=================================================================================
+#  Server Uptime monitor with variable NumberofDays to determine if server NOT being rebooted monthly for patches
+#
+#  Author:  Kevin Justin
+#  v1.0
+#=================================================================================
+param([int]$NumberOfDays)
+
+# Manual Testing section - put stuff here for manually testing script - typically parameters:
+#=================================================================================
+# $NumberOfDays = "45"
+#=================================================================================
+
+
+# Constants section - modify stuff here:
+#=================================================================================
+# Assign script name variable for use in event logging.  
+$ScriptName = "Server.Uptime.Monitor.DS.ps1"
+$EventID = "562"
+#=================================================================================
+
+
+# Starting Script section - All scripts get this
+#=================================================================================
+# Gather the start time of the script
+$StartTime = Get-Date
+#Set variable to be used in logging events
+$whoami = whoami
+# Load MOMScript API
+$momapi = New-Object -comObject MOM.ScriptAPI
+# Load PropertyBag function 
+$bag = $momapi.CreatePropertyBag()
+#Log script event that we are starting task
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script is starting. `n Running as ($whoami).")
+#=================================================================================
+
+
+# Begin MAIN script section
+#=================================================================================
+#Log script parameters we received
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"`nScript parameters passed into datasource: `nNumberOfDays: ($NumberOfDays).")
+
+
+#Set the condition = bad.  This represents your script finding something wrong
+# Commands
+$Uptime = Get-CimInstance Win32_OperatingSystem | Select-Object LastBootUpTime 
+$Uptime 
+ 
+# Figure out days since last patch installed 
+$UTimeSpan = [DateTime](Get-Date) - [DateTime]$Uptime[0].LastBootUpTime
+$UTimeSpan
+
+$UDays = $UTimeSpan.Days
+ 
+# Test if days greater than 45 $NumberOfDays
+if ( $UTimeSpan.Days -ge $NumberOfDays)
+	{
+	Write-host -f yellow "Uptime greater than $NumberOfDays days"
+	$strCondition = "Bad"
+	$Message = "Server Uptime more than ($NumberOfDays) days ago.`n `nExamine server for working SCCM client"
+}
+if ( $UTimeSpan.Days -lt $NumberOfDays)
+	{
+	$strCondition = "Good"
+	$Message = "Server Uptime is ($UDays) days ago."
+	}
+
+#Check the value of $strCondition
+IF ($strCondition -eq "Good")
+{
+  $strCondition
+  $momapi.LogScriptEvent($ScriptName,$EventID,0,"`nServer uptime is ($UDays) days ago.")
+  $bag.AddValue('Result','GoodCondition')
+  $bag.AddValue('Message',$Message)
+}
+ELSE
+{
+  $momapi.LogScriptEvent($ScriptName,$EventID,0,"`nServer Uptime more than ($NumberOfDays) days ago.`n `nExamine server for working SCCM client")
+  $bag.AddValue('Result','BadCondition')
+  $bag.AddValue('Message',$Message)
+}
+
+# Return all bags
+$bag
+#=================================================================================
+# End MAIN script section
+
+
+# End of script section
+#=================================================================================
+#Log an event for script ending and total execution time.
+$EndTime = Get-Date
+$ScriptTime = ($EndTime - $StartTime).TotalSeconds
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+#=================================================================================
+# End of script
+                </ScriptBody>
+                <Parameters>
+                  <Parameter>
+                    <Name>NumberOfDays</Name>
+                    <Value>$Config/NumberOfDays$</Value>									
+                  </Parameter>	
+                  <Parameter>
+                    <Name>ComputerName</Name>
+                    <Value>$Config/ComputerName$</Value>									
+                  </Parameter>				  
+                </Parameters>				
+                <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
+              </ProbeAction>
+            </MemberModules>
+            <Composition>
+              <Node ID="PA">
+                <Node ID="Scheduler" />
+              </Node>
+            </Composition>
+          </Composite>
+        </ModuleImplementation>
+        <OutputType>System!System.PropertyBagData</OutputType>
+      </DataSourceModuleType>
+	  
+      <DataSourceModuleType ID="Server.Pending.Restart.Script.Alert.Rule.Datasource" Accessibility="Internal" Batching="false">
+        <Configuration>
+          <xsd:element minOccurs="1" type="xsd:integer" name="IntervalSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="0" type="xsd:string" name="SyncTime" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:integer" name="TimeoutSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:boolean" name="SCCMCheck" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:boolean" name="FileRenameCheck" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:boolean" name="ComBSCheck" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:boolean" name="ComRNDJCheck" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:boolean" name="WinUAUCheck" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+        </Configuration>
+        <OverrideableParameters>
+          <OverrideableParameter ID="IntervalSeconds" Selector="$Config/IntervalSeconds$" ParameterType="int" />
+          <OverrideableParameter ID="SyncTime" Selector="$Config/SyncTime$" ParameterType="string" />
+          <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />
+          <OverrideableParameter ID="SCCMCheck" Selector="$Config/SCCMCheck$" ParameterType="bool" />
+          <OverrideableParameter ID="FileRenameCheck" Selector="$Config/FileRenameCheck$" ParameterType="bool" />
+          <OverrideableParameter ID="ComBSCheck" Selector="$Config/ComBSCheck$" ParameterType="bool" />
+          <OverrideableParameter ID="ComRNDJCheck" Selector="$Config/ComRNDJCheck$" ParameterType="bool" />
+          <OverrideableParameter ID="WinUAUCheck" Selector="$Config/WinUAUCheck$" ParameterType="bool" />
+        </OverrideableParameters>
+        <ModuleImplementation Isolation="Any">
+          <Composite>
+            <MemberModules>
+              <DataSource ID="Scheduler" TypeID="System!System.Scheduler">
+                <Scheduler>
+                  <SimpleReccuringSchedule>
+                    <Interval Unit="Seconds">$Config/IntervalSeconds$</Interval>
+                    <SyncTime>$Config/SyncTime$</SyncTime>
+                  </SimpleReccuringSchedule>
+                  <ExcludeDates />
+                </Scheduler>
+              </DataSource>
+              <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagProbe">
+                <ScriptName>Server.Pending.Restart.Script.Alert.Rule.Datasource.ps1</ScriptName>
+                <ScriptBody>
+                  #=================================================================================
+                  #  Describe Script Here
+                  #
+                  #  Author:
+                  #  v1.0
+                  #=================================================================================
+                  param([String]$FileRenameCheck,[String]$SCCMCheck,[String]$ComBSCheck,[String]$ComRNDJCheck,[String]$WinUAUCheck)
+
+                  $FileN = [System.Convert]::ToBoolean($FileRenameCheck)
+
+                  $CM = [System.Convert]::ToBoolean($SCCMCheck)
+
+                  $CBS = [System.Convert]::ToBoolean($ComBSCheck)
+
+                  $RNDJ = [System.Convert]::ToBoolean($ComRNDJCheck)
+
+                  $WUAU = [System.Convert]::ToBoolean($WinUAUCheck)
+
+
+                  # Constants section - modify stuff here:
+                  #=================================================================================
+                  # Assign script name variable for use in event logging.
+                  $ScriptName = "Server.Pending.Restart.Alert.Rule.DataSource.ps1"
+                  $EventID = "1234"
+                  #=================================================================================
+                  # Starting Script section - All scripts get this
+                  #=================================================================================
+                  # Gather the start time of the script
+                  $StartTime = Get-Date
+                  #Set variable to be used in logging events
+                  $whoami = whoami
+                  # Load MOMScript API
+                  $momapi = New-Object -comObject MOM.ScriptAPI
+                  # Load PropertyBag function
+                  $bag = $momapi.CreatePropertyBag()
+                  #Log script event that we are starting task
+                  $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script is starting. `n Running as ($whoami).")
+
+                  #=================================================================================
+                  # Begin MAIN script section
+                  #=================================================================================
+
+                  $invokeWmiMethodParameters = @{
+                  Namespace    = 'root/default'
+                  Class        = 'StdRegProv'
+                  Name         = 'EnumKey'
+                  ComputerName = $env:COMPUTERNAME
+                  ErrorAction  = 'Stop'
+                  }
+
+                  $hklm = [UInt32] "0x80000002"
+
+                  if ($CBS -eq $true)
+                  {
+                  ## Query the Component Based Servicing Reg Key
+                  $invokeWmiMethodParameters.ArgumentList = @($hklm, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\')
+                  $registryComponentBasedServicing = (Invoke-WmiMethod @invokeWmiMethodParameters).sNames -contains 'RebootPending'
+                  }
+
+                  if ($WUAU -eq $true)
+                  {
+                  ## Query WUAU from the registry
+                  $invokeWmiMethodParameters.ArgumentList = @($hklm, 'SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\')
+                  $registryWindowsUpdateAutoUpdate = (Invoke-WmiMethod @invokeWmiMethodParameters).sNames -contains 'RebootRequired'
+                  }
+
+                  if ($RNDJ -eq $true)
+                  {
+
+                  ## Query JoinDomain key from the registry - These keys are present if pending a reboot from a domain join operation
+                  $invokeWmiMethodParameters.ArgumentList = @($hklm, 'SYSTEM\CurrentControlSet\Services\Netlogon')
+                  $registryNetlogon = (Invoke-WmiMethod @invokeWmiMethodParameters).sNames
+                  $pendingDomainJoin = ($registryNetlogon -contains 'JoinDomain') -or ($registryNetlogon -contains 'AvoidSpnSet')
+
+                  ## Query ComputerName and ActiveComputerName from the registry and setting the MethodName to GetMultiStringValue
+                  $invokeWmiMethodParameters.Name = 'GetMultiStringValue'
+                  $invokeWmiMethodParameters.ArgumentList = @($hklm, 'SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName\', 'ComputerName')
+                  $registryActiveComputerName = Invoke-WmiMethod @invokeWmiMethodParameters
+
+                  $invokeWmiMethodParameters.ArgumentList = @($hklm, 'SYSTEM\CurrentControlSet\Control\ComputerName\ComputerName\', 'ComputerName')
+                  $registryComputerName = Invoke-WmiMethod @invokeWmiMethodParameters
+
+                  $pendingComputerRename = $registryActiveComputerName -ne $registryComputerName -or $pendingDomainJoin
+                  }
+
+                  ## Query PendingFileRenameOperations from the registry
+                  if ($FileN -eq $true)
+                  {
+                  $invokeWmiMethodParameters.ArgumentList = @($hklm, 'SYSTEM\CurrentControlSet\Control\Session Manager\', 'PendingFileRenameOperations')
+                  [string]$registryPendingFileRenameOperations = (Invoke-WmiMethod @invokeWmiMethodParameters).sValue
+                  $registryPendingFileRenameOperationsBool = [bool]$registryPendingFileRenameOperations
+                  }
+
+                  ## Query ClientSDK for pending reboot status, unless SkipConfigurationManagerClientCheck is present
+                  if ($CM -eq $true)
+                  {
+                  $invokeWmiMethodParameters.NameSpace = 'ROOT\ccm\ClientSDK'
+                  $invokeWmiMethodParameters.Class = 'CCM_ClientUtilities'
+                  $invokeWmiMethodParameters.Name = 'DetermineifRebootPending'
+                  $invokeWmiMethodParameters.Remove('ArgumentList')
+
+                  try
+                  {
+                  $sccmClientSDK = Invoke-WmiMethod @invokeWmiMethodParameters
+                  $systemCenterConfigManager = $sccmClientSDK.ReturnValue -eq 0 -and ($sccmClientSDK.IsHardRebootPending -or $sccmClientSDK.RebootPending)
+                  }
+                  catch
+                  {
+                  $systemCenterConfigManager = "No SCCM Agent present on this computer"
+                  Write-Verbose -Message ($script:localizedData.invokeWmiClientSDKError -f $computer)
+                  }
+                  }
+
+                  # Querying for last reboot
+                  $lastreboot = Get-WmiObject win32_operatingsystem -ComputerName $env:computername | select csname, @{LABEL='LastBootUpTime';EXPRESSION={$_.ConverttoDateTime($_.lastbootuptime)}}
+
+                  $isRebootPending = $registryComponentBasedServicing -or `
+                  $pendingComputerRename -or `
+                  $pendingDomainJoin -or `
+                  $registryPendingFileRenameOperationsBool -or `
+                  $(if ([string]$systemCenterConfigManager -eq "True"){$systemCenterConfigManager}) -or `
+                  $registryWindowsUpdateAutoUpdate
+
+                  $Result =  [PSCustomObject]@{
+                  ComputerName                     = $computer
+                  ComponentBasedServicing          = $(if ([string]::IsNullOrWhiteSpace($registryComponentBasedServicing)) {"Monitoring not enabled for this condition"} else {$registryComponentBasedServicing})
+                  PendingComputerRenameDomainJoin  = $(if ([string]::IsNullOrWhiteSpace($pendingComputerRename)) {"Monitoring not enabled for this condition"} else {$pendingComputerRename})
+                  PendingFileRenameOperations      = $(if ([string]::IsNullOrWhiteSpace($registryPendingFileRenameOperationsBool)) {"Monitoring not enabled for this condition"} else {$registryPendingFileRenameOperationsBool})
+                  PendingFileRenameOperationsValue = $registryPendingFileRenameOperations
+                  SystemCenterConfigManager        = $(if ([string]::IsNullOrWhiteSpace($systemCenterConfigManager)) {"Monitoring not enabled for this condition"} else {$systemCenterConfigManager})
+                  WindowsUpdateAutoUpdate          = $(if ([string]::IsNullOrWhiteSpace($registryWindowsUpdateAutoUpdate)) {"Monitoring not enabled for this condition"} else {$registryWindowsUpdateAutoUpdate})
+                  IsRebootPending                  = $isRebootPending
+                  LastBootUpTime                   = $lastreboot.LastBootUpTime
+                  }
+
+                  IF ($Result.IsRebootPending -eq $True)
+                  {
+                  $RestartPending = "YES"
+                  }
+                  ELSE
+                  {
+                  $RestartPending = "NO"
+                  }
+
+                  #Check the value of RebootPending
+                  IF ($RestartPending -eq "NO")
+                  {
+                  $momapi.LogScriptEvent($ScriptName,$EventID,0, "`No restart pending detected")
+                  $bag.AddValue("RestartPending", 'NoRestartPending')
+                  }
+                  ELSE
+                  {
+                  $momapi.LogScriptEvent($ScriptName,$EventID,0, "`Restart pending detected. `Details = ($Result)")
+                  $bag.AddValue("RestartPending", 'RestartPending')
+                  $bag.AddValue("ComponentBasedServicing", $Result.ComponentBasedServicing)
+                  $bag.AddValue("PendingComputerRenameDomainJoin", $Result.PendingComputerRenameDomainJoin)
+                  $bag.AddValue("PendingFileRenameOperations", $Result.PendingFileRenameOperations)
+                  $bag.AddValue("PendingFileRenameOperationsValue", $Result.PendingFileRenameOperationsValue)
+                  $bag.AddValue("SystemCenterConfigManager", $Result.SystemCenterConfigManager)
+                  $bag.AddValue("WindowsUpdateAutoUpdate", $Result.WindowsUpdateAutoUpdate)
+                  $bag.AddValue("LastBootUpTime", $Result.LastBootUpTime)
+                  }
+
+                  # Return all bags
+                  $bag
+
+                  # End of script section
+                  #=================================================================================
+                  #Log an event for script ending and total execution time.
+                  $EndTime = Get-Date
+                  $ScriptTime = ($EndTime - $StartTime).TotalSeconds
+                  $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+                  #=================================================================================
+                  # End of script
+
+                </ScriptBody>
+                <Parameters>
+                  <Parameter>
+                    <Name>SCCMCheck</Name>
+                    <Value>$Config/SCCMCheck$</Value>
+                  </Parameter>
+                  <Parameter>
+                    <Name>FileRenameCheck</Name>
+                    <Value>$Config/FileRenameCheck$</Value>
+                  </Parameter>
+                  <Parameter>
+                    <Name>ComBSCheck</Name>
+                    <Value>$Config/ComBSCheck$</Value>
+                  </Parameter>
+                  <Parameter>
+                    <Name>ComRNDJCheck</Name>
+                    <Value>$Config/ComRNDJCheck$</Value>
+                  </Parameter>
+                  <Parameter>
+                    <Name>WinUAUCheck</Name>
+                    <Value>$Config/WinUAUCheck$</Value>
+                  </Parameter>
+                </Parameters>
+                <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
+              </ProbeAction>
+            </MemberModules>
+            <Composition>
+              <Node ID="PA">
+                <Node ID="Scheduler" />
+              </Node>
+            </Composition>
+          </Composite>
+        </ModuleImplementation>
+        <OutputType>System!System.PropertyBagData</OutputType>
+      </DataSourceModuleType>
+      <DataSourceModuleType ID="Server.Last.Patch.Applied.Script.Alert.Rule.Datasource" Accessibility="Internal" Batching="false">
+        <Configuration>
+          <xsd:element minOccurs="1" type="xsd:integer" name="IntervalSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="0" type="xsd:string" name="SyncTime" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+		  <xsd:element minOccurs="1" type="xsd:integer" name="NumberOfDays" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:integer" name="TimeoutSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+        </Configuration>
+        <OverrideableParameters>
+          <OverrideableParameter ID="IntervalSeconds" Selector="$Config/IntervalSeconds$" ParameterType="int" />
+          <OverrideableParameter ID="SyncTime" Selector="$Config/SyncTime$" ParameterType="string" />
+		  <OverrideableParameter ID="NumberOfDays" Selector="$Config/NumberOfDays$" ParameterType="int" />
+          <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />	  
+        </OverrideableParameters>
+        <ModuleImplementation Isolation="Any">
+          <Composite>
+            <MemberModules>
+              <DataSource ID="Scheduler" TypeID="System!System.Scheduler">
+                <Scheduler>
+                  <SimpleReccuringSchedule>
+                    <Interval Unit="Seconds">$Config/IntervalSeconds$</Interval>
+                    <SyncTime>$Config/SyncTime$</SyncTime>
+                  </SimpleReccuringSchedule>
+                  <ExcludeDates />
+                </Scheduler>
+              </DataSource>
+              <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagProbe">
+                <ScriptName>Server.Last.Patch.Applied.Script.Alert.Rule.Datasource.ps1</ScriptName>
+                <ScriptBody>
+#=================================================================================
+#  PowerShell script to calculate last patch applied is over x days old
+#  x days old is controlled by $NumberOfDays variable.
+#
+#  Author:  Kevin Justin
+#  v1.0
+#=================================================================================
+param([int]$NumberOfDays)
+
+
+# Manual Testing section - put stuff here for manually testing script - typically parameters:
+#=================================================================================
+# $NumberOfDays = "45"
+#=================================================================================
+
+
+# Constants section - modify stuff here:
+#=================================================================================
+# Assign script name variable for use in event logging.  
+$ScriptName = "Server.Last.Patch.Applied.Monitor.DS.ps1"
+$EventID = "561"
+#=================================================================================
+
+
+# Starting Script section - All scripts get this
+#=================================================================================
+# Gather the start time of the script
+$StartTime = Get-Date
+#Set variable to be used in logging events
+$whoami = whoami
+# Load MOMScript API
+$momapi = New-Object -comObject MOM.ScriptAPI
+# Load PropertyBag function 
+$bag = $momapi.CreatePropertyBag()
+#Log script event that we are starting task
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script is starting. `n Running as ($whoami).")
+#=================================================================================
+
+
+# Begin MAIN script section
+#=================================================================================
+#Log script parameters we received
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"`nScript parameters passed into datasource: `nNumberOfDays: ($NumberOfDays).")
+
+#Set the condition = bad.  This represents your script finding something wrong
+
+#
+# Figure out last patch
+$Patches = get-hotfix | sort installedon -Descending
+ 
+# Log latest patch installed
+$Patches | where installedon -eq $Patches[0].InstalledOn 
+ 
+# Figure out days since last patch installed
+$TimeSpan = [DateTime](Get-Date) - [DateTime]$Patches[0].InstalledOn
+ 
+$TimeSpan.Days
+$Days = $TimeSpan.Days
+  
+# Test if days greater than $NumberOfDays
+if ( $TimeSpan.Days -ge $NumberOfDays)
+	{
+	Write-host -f yellow "Greater than ($NumberOfDays)"
+	$strCondition = "Bad"
+	$Message = "Server Last Patched more than ($NumberOfDays) days ago.`n `nExamine server for working SCCM client"
+	}
+if ( $TimeSpan.Days -lt $NumberOfDays)
+	{
+	$strCondition = "Good"
+	$Message = "Server Last patched ($Days) days ago."
+	}
+
+#Check the value of $strCondition
+IF ($strCondition -eq "Good")
+{
+  $strCondition
+  $momapi.LogScriptEvent($ScriptName,$EventID,0,"`nServer last patched ($Days) days ago.")
+  $bag.AddValue('Result','GoodCondition')
+  $bag.AddValue('Message',$Message)
+}
+ELSE
+{
+  $strCondition
+  $momapi.LogScriptEvent($ScriptName,$EventID,0,"`nServer last patched more than ($NumberOfDays) days ago.`n `nExamine server for working SCCM client")
+  $bag.AddValue('Result','BadCondition')
+  $bag.AddValue('Message',$Message)
+}
+
+# Return all bags
+$bag
+#=================================================================================
+# End MAIN script section
+
+
+# End of script section
+#=================================================================================
+#Log an event for script ending and total execution time.
+$EndTime = Get-Date
+$ScriptTime = ($EndTime - $StartTime).TotalSeconds
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+#=================================================================================
+# End of script
+                </ScriptBody>
+                <Parameters>
+                  <Parameter>
+                    <Name>NumberOfDays</Name>
+                    <Value>$Config/NumberOfDays$</Value>									
+                  </Parameter>			  
+                </Parameters>				
+                <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
+              </ProbeAction>			  
+            </MemberModules>
+            <Composition>
+              <Node ID="PA">
+                <Node ID="Scheduler" />
+              </Node>
+            </Composition>
+          </Composite>
+        </ModuleImplementation>
+        <OutputType>System!System.PropertyBagData</OutputType>
+      </DataSourceModuleType>
+      <DataSourceModuleType ID="Server.Uptime.Script.Alert.Rule.Datasource" Accessibility="Internal" Batching="false">
+        <Configuration>
+          <xsd:element minOccurs="1" type="xsd:integer" name="IntervalSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="0" type="xsd:string" name="SyncTime" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+		  <xsd:element minOccurs="1" type="xsd:integer" name="NumberOfDays" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:integer" name="TimeoutSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+        </Configuration>
+        <OverrideableParameters>
+          <OverrideableParameter ID="IntervalSeconds" Selector="$Config/IntervalSeconds$" ParameterType="int" />
+          <OverrideableParameter ID="SyncTime" Selector="$Config/SyncTime$" ParameterType="string" />
+          <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />
+		  <OverrideableParameter ID="NumberOfDays" Selector="$Config/NumberOfDays$" ParameterType="int" />	  
+        </OverrideableParameters>
+        <ModuleImplementation Isolation="Any">
+          <Composite>
+            <MemberModules>
+              <DataSource ID="Scheduler" TypeID="System!System.Scheduler">
+                <Scheduler>
+                  <SimpleReccuringSchedule>
+                    <Interval Unit="Seconds">$Config/IntervalSeconds$</Interval>
+                    <SyncTime>$Config/SyncTime$</SyncTime>
+                  </SimpleReccuringSchedule>
+                  <ExcludeDates />
+                </Scheduler>
+              </DataSource>
+              <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagProbe">
+                <ScriptName>Server.Uptime.Script.Alert.Rule.Datasource.ps1</ScriptName>
+                <ScriptBody>
+#=================================================================================
+#  Server Uptime monitor with variable NumberofDays to determine if server NOT being rebooted monthly for patches
+#
+#  Author:  Kevin Justin
+#  v1.0
+#=================================================================================
+param([int]$NumberOfDays)
+
+# Manual Testing section - put stuff here for manually testing script - typically parameters:
+#=================================================================================
+# $NumberOfDays = "45"
+#=================================================================================
+
+
+# Constants section - modify stuff here:
+#=================================================================================
+# Assign script name variable for use in event logging.  
+$ScriptName = "Server.Uptime.Monitor.DS.ps1"
+$EventID = "562"
+#=================================================================================
+
+
+# Starting Script section - All scripts get this
+#=================================================================================
+# Gather the start time of the script
+$StartTime = Get-Date
+#Set variable to be used in logging events
+$whoami = whoami
+# Load MOMScript API
+$momapi = New-Object -comObject MOM.ScriptAPI
+# Load PropertyBag function 
+$bag = $momapi.CreatePropertyBag()
+#Log script event that we are starting task
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script is starting. `n Running as ($whoami).")
+#=================================================================================
+
+
+# Begin MAIN script section
+#=================================================================================
+#Log script parameters we received
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"`nScript parameters passed into datasource: `nNumberOfDays: ($NumberOfDays).")
+
+
+#Set the condition = bad.  This represents your script finding something wrong
+# Commands
+$Uptime = Get-CimInstance Win32_OperatingSystem | Select-Object LastBootUpTime 
+$Uptime 
+ 
+# Figure out days since last patch installed 
+$UTimeSpan = [DateTime](Get-Date) - [DateTime]$Uptime[0].LastBootUpTime
+$UTimeSpan
+
+$UDays = $UTimeSpan.Days
+ 
+# Test if days greater than 45 $NumberOfDays
+if ( $UTimeSpan.Days -ge $NumberOfDays)
+	{
+	Write-host -f yellow "Uptime greater than $NumberOfDays days"
+	$strCondition = "Bad"
+	$Message = "Server Uptime more than ($NumberOfDays) days ago.`n `nExamine server for working SCCM client"
+}
+if ( $UTimeSpan.Days -lt $NumberOfDays)
+	{
+	$strCondition = "Good"
+	$Message = "Server Uptime is ($UDays) days ago."
+	}
+
+#Check the value of $strCondition
+IF ($strCondition -eq "Good")
+{
+  $strCondition
+  $momapi.LogScriptEvent($ScriptName,$EventID,0,"`nServer uptime is ($UDays) days ago.")
+  $bag.AddValue('Result','GoodCondition')
+  $bag.AddValue('Message',$Message)
+}
+ELSE
+{
+  $momapi.LogScriptEvent($ScriptName,$EventID,0,"`nServer Uptime more than ($NumberOfDays) days ago.`n `nExamine server for working SCCM client")
+  $bag.AddValue('Result','BadCondition')
+  $bag.AddValue('Message',$Message)
+}
+
+# Return all bags
+$bag
+#=================================================================================
+# End MAIN script section
+
+
+# End of script section
+#=================================================================================
+#Log an event for script ending and total execution time.
+$EndTime = Get-Date
+$ScriptTime = ($EndTime - $StartTime).TotalSeconds
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+#=================================================================================
+# End of script
+                </ScriptBody>
+                <Parameters>
+                  <Parameter>
+                    <Name>NumberOfDays</Name>
+                    <Value>$Config/NumberOfDays$</Value>									
+                  </Parameter>				  
+                </Parameters>				
+                <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
+              </ProbeAction>
+            </MemberModules>
+            <Composition>
+              <Node ID="PA">
+                <Node ID="Scheduler" />
+              </Node>
+            </Composition>
+          </Composite>
+        </ModuleImplementation>
+        <OutputType>System!System.PropertyBagData</OutputType>
+      </DataSourceModuleType>
+    </ModuleTypes>
+    <MonitorTypes>
+      <UnitMonitorType ID="Server.Pending.Restart.Monitor.MonitorType" Accessibility="Internal">
+        <MonitorTypeStates>
+          <MonitorTypeState ID="NoRestartPending" NoDetection="false" />
+          <MonitorTypeState ID="RestartPending" NoDetection="false" />
+        </MonitorTypeStates>
+        <Configuration>
+          <xsd:element minOccurs="1" type="xsd:integer" name="IntervalSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="0" type="xsd:string" name="SyncTime" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:integer" name="TimeoutSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:string" name="ComputerName" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:boolean" name="SCCMCheck" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:boolean" name="FileRenameCheck" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:boolean" name="ComBSCheck" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:boolean" name="ComRNDJCheck" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:boolean" name="WinUAUCheck" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+        </Configuration>
+        <OverrideableParameters>
+          <OverrideableParameter ID="IntervalSeconds" Selector="$Config/IntervalSeconds$" ParameterType="int" />
+          <OverrideableParameter ID="SyncTime" Selector="$Config/SyncTime$" ParameterType="string" />
+          <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />
+          <OverrideableParameter ID="SCCMCheck" Selector="$Config/SCCMCheck$" ParameterType="bool" />
+          <OverrideableParameter ID="FileRenameCheck" Selector="$Config/FileRenameCheck$" ParameterType="bool" />
+          <OverrideableParameter ID="ComBSCheck" Selector="$Config/ComBSCheck$" ParameterType="bool" />
+          <OverrideableParameter ID="ComRNDJCheck" Selector="$Config/ComRNDJCheck$" ParameterType="bool" />
+          <OverrideableParameter ID="WinUAUCheck" Selector="$Config/WinUAUCheck$" ParameterType="bool" />
+        </OverrideableParameters>
+        <MonitorImplementation>
+          <MemberModules>
+            <DataSource ID="DS" TypeID="Server.Pending.Restart.Monitor.DataSource">
+              <IntervalSeconds>$Config/IntervalSeconds$</IntervalSeconds>
+              <SyncTime>$Config/SyncTime$</SyncTime>
+              <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
+			  <ComputerName>$Config/ComputerName$</ComputerName>
+              <SCCMCheck>$Config/SCCMCheck$</SCCMCheck>
+              <FileRenameCheck>$Config/FileRenameCheck$</FileRenameCheck>
+              <ComBSCheck>$Config/ComBSCheck$</ComBSCheck>
+              <ComRNDJCheck>$Config/ComRNDJCheck$</ComRNDJCheck>
+              <WinUAUCheck>$Config/WinUAUCheck$</WinUAUCheck>
+            </DataSource>
+            <ConditionDetection ID="NoRestartPendingFilter" TypeID="System!System.ExpressionFilter">
+              <Expression>
+                <SimpleExpression>
+                  <ValueExpression>
+                    <XPathQuery Type="String">Property[@Name='RestartPending']</XPathQuery>
+                  </ValueExpression>
+                  <Operator>Equal</Operator>
+                  <ValueExpression>
+                    <Value Type="String">NoRestartPending</Value>
+                  </ValueExpression>
+                </SimpleExpression>
+              </Expression>
+            </ConditionDetection>
+            <ConditionDetection ID="RestartPendingFilter" TypeID="System!System.ExpressionFilter">
+              <Expression>
+                <SimpleExpression>
+                  <ValueExpression>
+                    <XPathQuery Type="String">Property[@Name='RestartPending']</XPathQuery>
+                  </ValueExpression>
+                  <Operator>Equal</Operator>
+                  <ValueExpression>
+                    <Value Type="String">RestartPending</Value>
+                  </ValueExpression>
+                </SimpleExpression>
+              </Expression>
+            </ConditionDetection>
+          </MemberModules>
+          <RegularDetections>
+            <RegularDetection MonitorTypeStateID="NoRestartPending">
+              <Node ID="NoRestartPendingFilter">
+                <Node ID="DS" />
+              </Node>
+            </RegularDetection>
+            <RegularDetection MonitorTypeStateID="RestartPending">
+              <Node ID="RestartPendingFilter">
+                <Node ID="DS" />
+              </Node>
+            </RegularDetection>
+          </RegularDetections>
+          <OnDemandDetections>
+            <OnDemandDetection MonitorTypeStateID="NoRestartPending">
+              <Node ID="NoRestartPendingFilter">
+                <Node ID="DS" />
+              </Node>
+            </OnDemandDetection>
+            <OnDemandDetection MonitorTypeStateID="RestartPending">
+              <Node ID="RestartPendingFilter">
+                <Node ID="DS" />
+              </Node>
+            </OnDemandDetection>
+          </OnDemandDetections>
+        </MonitorImplementation>
+      </UnitMonitorType>
+      <UnitMonitorType ID="Server.Last.Patch.Applied.Monitor.MonitorType" Accessibility="Internal">
+        <MonitorTypeStates>
+          <MonitorTypeState ID="GoodCondition" NoDetection="false" />
+          <MonitorTypeState ID="BadCondition" NoDetection="false" />
+        </MonitorTypeStates>
+        <Configuration>
+          <xsd:element minOccurs="1" type="xsd:integer" name="IntervalSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="0" type="xsd:string" name="SyncTime" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:integer" name="NumberOfDays" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:string" name="ComputerName" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />		  
+          <xsd:element minOccurs="1" type="xsd:integer" name="TimeoutSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+		  <xsd:element minOccurs="1" type="xsd:integer" name="MatchCount" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+        </Configuration>
+        <OverrideableParameters>
+		  <OverrideableParameter ID="IntervalSeconds" Selector="$Config/IntervalSeconds$" ParameterType="int" />
+		  <OverrideableParameter ID="SyncTime" Selector="$Config/SyncTime$" ParameterType="string" />
+		  <OverrideableParameter ID="NumberOfDays" Selector="$Config/NumberOfDays$" ParameterType="int" />
+		  <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />
+		  <OverrideableParameter ID="MatchCount" Selector="$Config/MatchCount$" ParameterType="int" />		  
+        </OverrideableParameters>
+        <MonitorImplementation>
+          <MemberModules>
+            <DataSource ID="DS" TypeID="Server.Last.Patch.Applied.Monitor.DS">
+			  <IntervalSeconds>$Config/IntervalSeconds$</IntervalSeconds>
+			  <SyncTime>$Config/SyncTime$</SyncTime>
+			  <NumberOfDays>$Config/NumberOfDays$</NumberOfDays>
+			  <ComputerName>$Config/ComputerName$</ComputerName>
+			  <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
+            </DataSource>
+            <ConditionDetection ID="GoodConditionFilter" TypeID="System!System.ExpressionFilter">
+              <Expression>
+                <SimpleExpression>
+                  <ValueExpression>
+                    <XPathQuery Type="String">Property[@Name='Result']</XPathQuery>
+                  </ValueExpression>
+                  <Operator>Equal</Operator>
+                  <ValueExpression>
+                    <Value Type="String">GoodCondition</Value>
+                  </ValueExpression>
+                </SimpleExpression>
+              </Expression>
+            </ConditionDetection>
+            <ConditionDetection ID="BadConditionFilter" TypeID="System!System.ExpressionFilter">
+              <Expression>
+                <SimpleExpression>
+                  <ValueExpression>
+                    <XPathQuery Type="String">Property[@Name='Result']</XPathQuery>
+                  </ValueExpression>
+                  <Operator>Equal</Operator>
+                  <ValueExpression>
+                    <Value Type="String">BadCondition</Value>
+                  </ValueExpression>
+                </SimpleExpression>
+              </Expression>
+			  <SuppressionSettings>
+                <MatchCount>$Config/MatchCount$</MatchCount>
+              </SuppressionSettings>
+            </ConditionDetection>
+          </MemberModules>
+          <RegularDetections>
+            <RegularDetection MonitorTypeStateID="GoodCondition">
+              <Node ID="GoodConditionFilter">
+                <Node ID="DS" />
+              </Node>
+            </RegularDetection>
+            <RegularDetection MonitorTypeStateID="BadCondition">
+              <Node ID="BadConditionFilter">
+                <Node ID="DS" />
+              </Node>
+            </RegularDetection>
+          </RegularDetections>
+          <OnDemandDetections>
+            <OnDemandDetection MonitorTypeStateID="GoodCondition">
+              <Node ID="GoodConditionFilter">
+                <Node ID="DS" />
+              </Node>
+            </OnDemandDetection>
+            <OnDemandDetection MonitorTypeStateID="BadCondition">
+              <Node ID="BadConditionFilter">
+                <Node ID="DS" />
+              </Node>
+            </OnDemandDetection>
+          </OnDemandDetections>
+        </MonitorImplementation>
+      </UnitMonitorType>
+      <UnitMonitorType ID="Server.Uptime.Monitor.MonitorType" Accessibility="Internal">
+        <MonitorTypeStates>
+          <MonitorTypeState ID="GoodCondition" NoDetection="false" />
+          <MonitorTypeState ID="BadCondition" NoDetection="false" />
+        </MonitorTypeStates>
+        <Configuration>
+          <xsd:element minOccurs="1" type="xsd:integer" name="IntervalSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="0" type="xsd:string" name="SyncTime" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:integer" name="NumberOfDays" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:string" name="ComputerName" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:integer" name="TimeoutSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+		  <xsd:element minOccurs="1" type="xsd:integer" name="MatchCount" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+        </Configuration>
+        <OverrideableParameters>
+		  <OverrideableParameter ID="IntervalSeconds" Selector="$Config/IntervalSeconds$" ParameterType="int" />
+		  <OverrideableParameter ID="SyncTime" Selector="$Config/SyncTime$" ParameterType="string" />
+		  <OverrideableParameter ID="NumberOfDays" Selector="$Config/NumberOfDays$" ParameterType="int" />
+		  <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />
+		  <OverrideableParameter ID="MatchCount" Selector="$Config/MatchCount$" ParameterType="int" />		  
+        </OverrideableParameters>
+        <MonitorImplementation>
+          <MemberModules>
+            <DataSource ID="DS" TypeID="Server.Uptime.Monitor.DS">
+			  <IntervalSeconds>$Config/IntervalSeconds$</IntervalSeconds>
+			  <SyncTime>$Config/SyncTime$</SyncTime>			  
+			  <NumberOfDays>$Config/NumberOfDays$</NumberOfDays>
+			  <ComputerName>$Config/ComputerName$</ComputerName>
+			  <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
+            </DataSource>
+            <ConditionDetection ID="GoodConditionFilter" TypeID="System!System.ExpressionFilter">
+              <Expression>
+                <SimpleExpression>
+                  <ValueExpression>
+                    <XPathQuery Type="String">Property[@Name='Result']</XPathQuery>
+                  </ValueExpression>
+                  <Operator>Equal</Operator>
+                  <ValueExpression>
+                    <Value Type="String">GoodCondition</Value>
+                  </ValueExpression>
+                </SimpleExpression>
+              </Expression>
+            </ConditionDetection>
+            <ConditionDetection ID="BadConditionFilter" TypeID="System!System.ExpressionFilter">
+              <Expression>
+                <SimpleExpression>
+                  <ValueExpression>
+                    <XPathQuery Type="String">Property[@Name='Result']</XPathQuery>
+                  </ValueExpression>
+                  <Operator>Equal</Operator>
+                  <ValueExpression>
+                    <Value Type="String">BadCondition</Value>
+                  </ValueExpression>
+                </SimpleExpression>
+              </Expression>
+			  <SuppressionSettings>
+                <MatchCount>$Config/MatchCount$</MatchCount>
+              </SuppressionSettings>
+            </ConditionDetection>
+          </MemberModules>
+          <RegularDetections>
+            <RegularDetection MonitorTypeStateID="GoodCondition">
+              <Node ID="GoodConditionFilter">
+                <Node ID="DS" />
+              </Node>
+            </RegularDetection>
+            <RegularDetection MonitorTypeStateID="BadCondition">
+              <Node ID="BadConditionFilter">
+                <Node ID="DS" />
+              </Node>
+            </RegularDetection>
+          </RegularDetections>
+          <OnDemandDetections>
+            <OnDemandDetection MonitorTypeStateID="GoodCondition">
+              <Node ID="GoodConditionFilter">
+                <Node ID="DS" />
+              </Node>
+            </OnDemandDetection>
+            <OnDemandDetection MonitorTypeStateID="BadCondition">
+              <Node ID="BadConditionFilter">
+                <Node ID="DS" />
+              </Node>
+            </OnDemandDetection>
+          </OnDemandDetections>
+        </MonitorImplementation>
+      </UnitMonitorType>
+    </MonitorTypes>
+  </TypeDefinitions>
+  <Monitoring>
+    <Rules>
+      <Rule ID="Server.Pending.Restart.Script.Alert.Rule" Enabled="false" Target="Windows!Microsoft.Windows.Server.OperatingSystem" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
+        <Category>Alert</Category>
+        <DataSources>
+          <DataSource ID="DS" TypeID="Server.Pending.Restart.Script.Alert.Rule.Datasource">
+            <IntervalSeconds>86400</IntervalSeconds>
+            <SyncTime />
+            <TimeoutSeconds>120</TimeoutSeconds>
+            <SCCMCheck>true</SCCMCheck>
+            <FileRenameCheck>false</FileRenameCheck>
+            <ComBSCheck>true</ComBSCheck>
+            <ComRNDJCheck>true</ComRNDJCheck>
+            <WinUAUCheck>true</WinUAUCheck>
+          </DataSource>
+        </DataSources>
+        <ConditionDetection ID="CD" TypeID="System!System.ExpressionFilter">
+          <Expression>
+            <SimpleExpression>
+              <ValueExpression>
+                <XPathQuery Type="String">Property[@Name='RestartPending']</XPathQuery>
+              </ValueExpression>
+              <Operator>Equal</Operator>
+              <ValueExpression>
+                <Value Type="String">RestartPending</Value>
+              </ValueExpression>
+            </SimpleExpression>
+          </Expression>
+        </ConditionDetection>
+        <WriteActions>
+          <WriteAction ID="WA" TypeID="Health!System.Health.GenerateAlert">
+            <Priority>1</Priority>
+            <!-- 0=Low, 1=Medium, 2=High -->
+            <Severity>1</Severity>
+            <!-- 0=Information, 1=Warning, 2=Critical -->
+            <AlertMessageId>$MPElement[Name="Server.Pending.Restart.Script.Alert.Rule.AlertMessage"]$</AlertMessageId>
+            <AlertParameters>
+              <AlertParameter1>$Data/Property[@Name='ComponentBasedServicing']$</AlertParameter1>
+              <AlertParameter2>$Data/Property[@Name='PendingComputerRenameDomainJoin']$</AlertParameter2>
+              <AlertParameter3>$Data/Property[@Name='PendingFileRenameOperations']$</AlertParameter3>
+              <AlertParameter4>$Data/Property[@Name='PendingFileRenameOperationsValue']$</AlertParameter4>
+              <AlertParameter5>$Data/Property[@Name='SystemCenterConfigManager']$</AlertParameter5>
+              <AlertParameter6>$Data/Property[@Name='WindowsUpdateAutoUpdate']$</AlertParameter6>
+              <AlertParameter7>$Data/Property[@Name='LastBootUpTime']$</AlertParameter7>
+            </AlertParameters>
+          </WriteAction>
+        </WriteActions>
+      </Rule>
+      <Rule ID="Server.Last.Patch.Applied.Script.Alert.Rule" Enabled="false" Target="Windows!Microsoft.Windows.Server.OperatingSystem" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
+        <Category>Alert</Category>
+        <DataSources>
+          <DataSource ID="DS" TypeID="Server.Last.Patch.Applied.Script.Alert.Rule.Datasource">
+            <IntervalSeconds>3600</IntervalSeconds>
+            <SyncTime></SyncTime>
+		    <NumberOfDays>45</NumberOfDays>			
+            <TimeoutSeconds>120</TimeoutSeconds>
+          </DataSource>
+        </DataSources>
+        <ConditionDetection ID="CD" TypeID="System!System.ExpressionFilter">
+		  <Expression>
+			<SimpleExpression>
+				<ValueExpression>
+				  <XPathQuery Type="String">Property[@Name='Result']</XPathQuery>
+				</ValueExpression>
+				<Operator>Equal</Operator>
+				<ValueExpression>
+				  <Value Type="String">BAD</Value>
+				</ValueExpression>
+			</SimpleExpression>
+		  </Expression>
+          <SuppressionSettings>
+            <MatchCount>1</MatchCount>
+          </SuppressionSettings>					
+        </ConditionDetection>
+        <WriteActions>
+          <WriteAction ID="WA" TypeID="Health!System.Health.GenerateAlert">
+            <Priority>1</Priority>  <!-- 0=Low, 1=Medium, 2=High -->
+            <Severity>1</Severity>  <!-- 0=Information, 1=Warning, 2=Critical -->
+            <AlertMessageId>$MPElement[Name="Server.Last.Patch.Applied.Script.Alert.Rule.AlertMessage"]$</AlertMessageId>
+            <AlertParameters>
+              <AlertParameter1>$Data/Property[@Name='Result']$</AlertParameter1>
+              <AlertParameter2>$Data/Property[@Name='Message']$</AlertParameter2>
+            </AlertParameters>
+            <Suppression>
+              <SuppressionValue>$Data/Property[@Name='Message']$</SuppressionValue>
+            </Suppression>
+          </WriteAction>
+        </WriteActions>
+      </Rule>
+      <Rule ID="Server.Uptime.Script.Alert.Rule" Enabled="false" Target="Windows!Microsoft.Windows.Server.OperatingSystem" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
+        <Category>Alert</Category>
+        <DataSources>
+          <DataSource ID="DS" TypeID="Server.Uptime.Script.Alert.Rule.Datasource">
+            <IntervalSeconds>3600</IntervalSeconds>
+            <SyncTime></SyncTime>
+			<NumberOfDays>45</NumberOfDays>
+            <TimeoutSeconds>120</TimeoutSeconds>
+          </DataSource>
+        </DataSources>
+        <ConditionDetection ID="CD" TypeID="System!System.ExpressionFilter">
+		  <Expression>
+			<SimpleExpression>
+				<ValueExpression>
+				  <XPathQuery Type="String">Property[@Name='Result']</XPathQuery>
+				</ValueExpression>
+				<Operator>Equal</Operator>
+				<ValueExpression>
+				  <Value Type="String">BAD</Value>
+				</ValueExpression>
+			</SimpleExpression>
+		  </Expression>
+          <SuppressionSettings>
+            <MatchCount>1</MatchCount>
+          </SuppressionSettings>					
+        </ConditionDetection>
+        <WriteActions>
+          <WriteAction ID="WA" TypeID="Health!System.Health.GenerateAlert">
+            <Priority>1</Priority>  <!-- 0=Low, 1=Medium, 2=High -->
+            <Severity>1</Severity>  <!-- 0=Information, 1=Warning, 2=Critical -->
+            <AlertMessageId>$MPElement[Name="Server.Uptime.Script.Alert.Rule.AlertMessage"]$</AlertMessageId>
+            <AlertParameters>
+              <AlertParameter1>$Data/Property[@Name='Result']$</AlertParameter1>
+              <AlertParameter2>$Data/Property[@Name='Message']$</AlertParameter2>
+            </AlertParameters>
+            <Suppression>
+              <SuppressionValue>$Data/Property[@Name='Message']$</SuppressionValue>
+            </Suppression>
+          </WriteAction>
+        </WriteActions>
+      </Rule>
+    </Rules>
+    <Monitors>
+      <UnitMonitor ID="Server.Pending.Restart.Monitor" Accessibility="Public" Enabled="true" Target="Windows!Microsoft.Windows.Server.OperatingSystem" ParentMonitorID="Health!System.Health.ConfigurationState" Remotable="true" Priority="Normal" TypeID="Server.Pending.Restart.Monitor.MonitorType" ConfirmDelivery="true">
+        <Category>AvailabilityHealth</Category>
+        <AlertSettings AlertMessage="Server.Pending.Restart.Monitor.AlertMessage">
+          <AlertOnState>Warning</AlertOnState>
+          <!-- Warning or Error should match OperationalStates below  -->
+          <AutoResolve>true</AutoResolve>
+          <AlertPriority>Normal</AlertPriority>
+          <AlertSeverity>MatchMonitorHealth</AlertSeverity>
+          <!-- Common options for AlertSeverity are MatchMonitorHealth, Information, Warning, Error -->
+          <AlertParameters>
+            <AlertParameter1>$Data/Context/Property[@Name='ComponentBasedServicing']$</AlertParameter1>
+            <AlertParameter2>$Data/Context/Property[@Name='PendingComputerRenameDomainJoin']$</AlertParameter2>
+            <AlertParameter3>$Data/Context/Property[@Name='PendingFileRenameOperations']$</AlertParameter3>
+            <AlertParameter4>$Data/Context/Property[@Name='PendingFileRenameOperationsValue']$</AlertParameter4>
+            <AlertParameter5>$Data/Context/Property[@Name='SystemCenterConfigManager']$</AlertParameter5>
+            <AlertParameter6>$Data/Context/Property[@Name='WindowsUpdateAutoUpdate']$</AlertParameter6>
+            <AlertParameter7>$Data/Context/Property[@Name='LastBootUpTime']$</AlertParameter7>
+          </AlertParameters>
+        </AlertSettings>
+        <OperationalStates>
+          <OperationalState ID="NoRestartPending" MonitorTypeStateID="NoRestartPending" HealthState="Success" />
+          <OperationalState ID="RestartPending" MonitorTypeStateID="RestartPending" HealthState="Warning" />
+          <!-- HealthState = Warning or Error -->
+        </OperationalStates>
+        <Configuration>
+          <IntervalSeconds>86400</IntervalSeconds>
+          <SyncTime />
+          <TimeoutSeconds>120</TimeoutSeconds>
+		  <ComputerName>$Target/Host/Property[Type="Windows!Microsoft.Windows.Computer"]/NetworkName$</ComputerName> 
+          <SCCMCheck>true</SCCMCheck>
+          <FileRenameCheck>false</FileRenameCheck>
+          <ComBSCheck>true</ComBSCheck>
+          <ComRNDJCheck>true</ComRNDJCheck>
+          <WinUAUCheck>true</WinUAUCheck>
+        </Configuration>
+      </UnitMonitor>
+      <UnitMonitor ID="Server.Last.Patch.Applied.Monitor" Accessibility="Public" Enabled="true" Target="Windows!Microsoft.Windows.Server.OperatingSystem" ParentMonitorID="Health!System.Health.ConfigurationState" Remotable="true" Priority="Normal" TypeID="Server.Last.Patch.Applied.Monitor.MonitorType" ConfirmDelivery="true">
+        <Category>AvailabilityHealth</Category>
+        <AlertSettings AlertMessage="Server.Last.Patch.Applied.Monitor.AlertMessage">
+          <AlertOnState>Warning</AlertOnState>  <!-- Warning or Error should match OperationalStates below  -->
+          <AutoResolve>true</AutoResolve>
+          <AlertPriority>Normal</AlertPriority>
+          <AlertSeverity>MatchMonitorHealth</AlertSeverity>  <!-- Common options for AlertSeverity are MatchMonitorHealth, Information, Warning, Error -->
+          <AlertParameters>
+            <AlertParameter1>$Data/Context/Property[@Name='Result']$</AlertParameter1> <!-- This is an example of passing property output from the script into the alert description -->
+            <AlertParameter2>$Data/Context/Property[@Name='Message']$</AlertParameter2>
+          </AlertParameters>
+        </AlertSettings>
+        <OperationalStates>
+          <OperationalState ID="GoodCondition" MonitorTypeStateID="GoodCondition" HealthState="Success" />
+          <OperationalState ID="BadCondition" MonitorTypeStateID="BadCondition" HealthState="Warning" />  <!-- HealthState = Warning or Error -->
+        </OperationalStates>
+        <Configuration>
+          <IntervalSeconds>86400</IntervalSeconds>
+		  <SyncTime></SyncTime>
+		  <NumberOfDays>45</NumberOfDays>  <!-- Just an example of some string data to pass into the script -->
+		  <ComputerName>$Target/Host/Property[Type="Windows!Microsoft.Windows.Computer"]/NetworkName$</ComputerName>  <!-- Might need to change the number of Host entries in this line depending on your target class -->
+          <TimeoutSeconds>120</TimeoutSeconds>
+		  <MatchCount>1</MatchCount>  <!-- This is the number of consecutive matches that must be met before the monitor will change state.  Also a good example of passing in Integer data. -->
+        </Configuration>
+      </UnitMonitor>
+      <UnitMonitor ID="Server.Uptime.Monitor" Accessibility="Public" Enabled="true" Target="Windows!Microsoft.Windows.Server.OperatingSystem" ParentMonitorID="Health!System.Health.ConfigurationState" Remotable="true" Priority="Normal" TypeID="Server.Uptime.Monitor.MonitorType" ConfirmDelivery="true">
+        <Category>AvailabilityHealth</Category>
+        <AlertSettings AlertMessage="Server.Uptime.Monitor.AlertMessage">
+          <AlertOnState>Warning</AlertOnState>  <!-- Warning or Error should match OperationalStates below  -->
+          <AutoResolve>true</AutoResolve>
+          <AlertPriority>Normal</AlertPriority>
+          <AlertSeverity>MatchMonitorHealth</AlertSeverity>  <!-- Common options for AlertSeverity are MatchMonitorHealth, Information, Warning, Error -->
+          <AlertParameters>
+            <AlertParameter1>$Data/Context/Property[@Name='Result']$</AlertParameter1> <!-- This is an example of passing property output from the script into the alert description -->
+            <AlertParameter2>$Data/Context/Property[@Name='Message']$</AlertParameter2>
+          </AlertParameters>
+        </AlertSettings>
+        <OperationalStates>
+          <OperationalState ID="GoodCondition" MonitorTypeStateID="GoodCondition" HealthState="Success" />
+          <OperationalState ID="BadCondition" MonitorTypeStateID="BadCondition" HealthState="Warning" />  <!-- HealthState = Warning or Error -->
+        </OperationalStates>
+        <Configuration>
+          <IntervalSeconds>86400</IntervalSeconds>
+		  <SyncTime></SyncTime>
+		  <NumberOfDays>45</NumberOfDays>  <!-- Just an example of some string data to pass into the script -->
+		  <ComputerName>$Target/Host/Property[Type="Windows!Microsoft.Windows.Computer"]/NetworkName$</ComputerName>  <!-- Might need to change the number of Host entries in this line depending on your target class -->
+          <TimeoutSeconds>120</TimeoutSeconds>
+		  <MatchCount>1</MatchCount>  <!-- This is the number of consecutive matches that must be met before the monitor will change state.  Also a good example of passing in Integer data. -->
+        </Configuration>
+      </UnitMonitor>
+    </Monitors>
+    <Overrides>
+      <MonitorConfigurationOverride ID="Override.Server.Pending.Restart.Monitor.ComBSCheck" Context="Windows!Microsoft.Windows.Server.OperatingSystem" Enforced="false" Monitor="Server.Pending.Restart.Monitor" Parameter="ComBSCheck">
+        <Value>true</Value>
+      </MonitorConfigurationOverride>
+      <MonitorConfigurationOverride ID="Override.Server.Pending.Restart.Monitor.ComRNDJCheck" Context="Windows!Microsoft.Windows.Server.OperatingSystem" Enforced="false" Monitor="Server.Pending.Restart.Monitor" Parameter="ComRNDJCheck">
+        <Value>true</Value>
+      </MonitorConfigurationOverride>
+      <MonitorConfigurationOverride ID="Override.Server.Pending.Restart.Monitor.SCCMCheck" Context="Windows!Microsoft.Windows.Server.OperatingSystem" Enforced="false" Monitor="Server.Pending.Restart.Monitor" Parameter="SCCMCheck">
+        <Value>true</Value>
+      </MonitorConfigurationOverride>
+      <MonitorConfigurationOverride ID="Override.Server.Pending.Restart.Monitor.WinUAUCheck" Context="Windows!Microsoft.Windows.Server.OperatingSystem" Enforced="false" Monitor="Server.Pending.Restart.Monitor" Parameter="WinUAUCheck">
+        <Value>true</Value>
+      </MonitorConfigurationOverride>
+    </Overrides>
+  </Monitoring>
+  <Presentation>
+    <Views>
+      <View ID="Proactive.Patch.Uptime.Reboot.Alert.View" Accessibility="Public" Enabled="true" Target="System!System.Entity" TypeID="SC!Microsoft.SystemCenter.AlertViewType" Visible="true">
+        <Category>Operations</Category>
+        <Criteria>
+          <SourceList>
+            <Source>
+              <Type>Monitor</Type>
+              <Id>$MPElement[Name="Server.Pending.Restart.Monitor"]$</Id>
+            </Source>
+            <Source>
+              <Type>Rule</Type>
+              <Id>$MPElement[Name="Server.Pending.Restart.Script.Alert.Rule"]$</Id>
+            </Source>
+          </SourceList>
+          <ResolutionState>
+            <StateRange Operator="NotEquals">255</StateRange>
+          </ResolutionState>
+        </Criteria>
+        <Presentation>
+          <ColumnInfo Index="0" SortIndex="0" Width="22" Grouped="true" Sorted="false" IsSortable="true" Visible="true" SortOrder="Ascending">
+            <Name>Severity</Name>
+            <Id>Severity</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="1" SortIndex="-1" Width="54" Grouped="false" Sorted="false" IsSortable="false" Visible="true" SortOrder="Ascending">
+            <Name>Icon</Name>
+            <Id>Icon</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="2" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Path</Name>
+            <Id>MonitoringObjectPath</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="3" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="true" SortOrder="Ascending">
+            <Name>Source</Name>
+            <Id>MonitoringObjectDisplayName</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="4" SortIndex="-1" Width="22" Grouped="false" Sorted="false" IsSortable="true" Visible="true" SortOrder="Ascending">
+            <Name>Maintenance Mode</Name>
+            <Id>MonitoringObjectInMaintenanceMode</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="5" SortIndex="-1" Width="250" Grouped="false" Sorted="false" IsSortable="true" Visible="true" SortOrder="Ascending">
+            <Name>Name</Name>
+            <Id>Name</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="6" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="true" SortOrder="Ascending">
+            <Name>Resolution State</Name>
+            <Id>ResolutionState</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="7" SortIndex="-1" Width="150" Grouped="false" Sorted="false" IsSortable="true" Visible="true" SortOrder="Ascending">
+            <Name>Created</Name>
+            <Id>TimeRaised</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="8" SortIndex="1" Width="100" Grouped="false" Sorted="true" IsSortable="true" Visible="true" SortOrder="Ascending">
+            <Name>Age</Name>
+            <Id>Age</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="9" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Type</Name>
+            <Id>Category</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="10" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Owner</Name>
+            <Id>Owner</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="11" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Priority</Name>
+            <Id>Priority</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="12" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Latency</Name>
+            <Id>Latency</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="13" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Description</Name>
+            <Id>Description</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="14" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Connector</Name>
+            <Id>ConnectorId</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="15" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Forwarding Status</Name>
+            <Id>ConnectorStatus</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="16" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Class</Name>
+            <Id>Class</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="17" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Time in State</Name>
+            <Id>TimeInState</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="18" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Custom Field 1</Name>
+            <Id>CustomField1</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="19" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Custom Field 2</Name>
+            <Id>CustomField2</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="20" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Custom Field 3</Name>
+            <Id>CustomField3</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="21" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Custom Field 4</Name>
+            <Id>CustomField4</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="22" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Custom Field 5</Name>
+            <Id>CustomField5</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="23" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Custom Field 6</Name>
+            <Id>CustomField6</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="24" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Custom Field 7</Name>
+            <Id>CustomField7</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="25" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Custom Field 8</Name>
+            <Id>CustomField8</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="26" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Custom Field 9</Name>
+            <Id>CustomField9</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="27" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Custom Field 10</Name>
+            <Id>CustomField10</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="28" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Resolved By</Name>
+            <Id>ResolvedBy</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="29" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Time Resolved</Name>
+            <Id>TimeResolved</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="30" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Last State Change</Name>
+            <Id>TimeResolutionStateLastModified</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="31" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Last Modified</Name>
+            <Id>LastModified</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="32" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Last Modified By</Name>
+            <Id>LastModifiedBy</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="33" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Management Group</Name>
+            <Id>ManagementGroup</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="34" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Site</Name>
+            <Id>SiteName</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="35" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Repeat Count</Name>
+            <Id>RepeatCount</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="36" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>Ticket ID</Name>
+            <Id>TicketId</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="37" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>TFS Work Item ID</Name>
+            <Id>TfsWorkItemId</Id>
+          </ColumnInfo>
+          <ColumnInfo Index="38" SortIndex="-1" Width="100" Grouped="false" Sorted="false" IsSortable="true" Visible="false" SortOrder="Ascending">
+            <Name>TFS Work Item Owner</Name>
+            <Id>TfsWorkItemOwner</Id>
+          </ColumnInfo>
+        </Presentation>
+        <Target />
+      </View>
+    </Views>
+    <Folders>
+      <Folder ID="Proactive.Patch.Uptime.Reboot.Root.Folder" Accessibility="Internal" ParentFolder="SC!Microsoft.SystemCenter.Monitoring.ViewFolder.Root" />
+    </Folders>
+    <FolderItems>
+      <FolderItem ElementID="Proactive.Patch.Uptime.Reboot.Alert.View" ID="Server.Pending.Restart.Alert.View.FolderItem" Folder="Proactive.Patch.Uptime.Reboot.Root.Folder" />
+    </FolderItems>
+    <StringResources>
+      <StringResource ID="Server.Pending.Restart.Monitor.AlertMessage" />
+      <StringResource ID="Server.Last.Patch.Applied.Monitor.AlertMessage" />
+      <StringResource ID="Server.Uptime.Monitor.AlertMessage" />
+      <StringResource ID="Server.Pending.Restart.Script.Alert.Rule.AlertMessage" />
+      <StringResource ID="Server.Last.Patch.Applied.Script.Alert.Rule.AlertMessage" />
+      <StringResource ID="Server.Uptime.Script.Alert.Rule.AlertMessage" />
+    </StringResources>
+  </Presentation>
+  <LanguagePacks>
+    <LanguagePack ID="ENU" IsDefault="true">
+      <DisplayStrings>
+        <DisplayString ElementID="Proactive.Patch.Uptime.Reboot.Monitoring">
+          <Name>Proactive Patch Uptime Reboot Monitoring</Name>
+          <Description>This is a SCOM management pack to collect Pending Reboots, uptime, patch compliance with get-hotfix on agents/servers to provide tasks which are useful for SysAdmin management and administration -- Kevin Justin
+Incorporates Gav Speed's 'Server.Pending.Restart' mgmt pack from TechNet to add pending reboot to Pending Patch and uptime checks.</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Patch.Uptime.Reboot.Alert.View">
+          <Name>Active Alerts</Name>
+          <Description />
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Patch.Uptime.Reboot.Root.Folder">
+          <Name>Proactive Pending Patch/Uptime/Restart</Name>
+          <Description />
+        </DisplayString>
+        <DisplayString ElementID="Server.Pending.Restart.Monitor">
+          <Name>Server Pending Restart Monitor</Name>
+          <Description>The "Server Pending Restart monitor" is designed to detect when a computer or server is pending a restart. See 'Product Knowledge' tab for addition information.</Description>
+        </DisplayString>
+        <DisplayString ElementID="Server.Pending.Restart.Monitor" SubElementID="NoRestartPending">
+          <Name>No restart pending detected</Name>
+        </DisplayString>
+        <DisplayString ElementID="Server.Pending.Restart.Monitor" SubElementID="RestartPending">
+          <Name>Restart pending detected</Name>
+        </DisplayString>
+        <DisplayString ElementID="Server.Pending.Restart.Monitor.AlertMessage">
+          <Name>PROACTIVE - Server restart pending detected</Name>
+          <Description>
+PROACTIVE - Server restart pending, see details below:
+
+Last boot up date / time - {6}
+			
+Server component check causing pending restart:
+			
+	Component Based Servicing - {0}
+    Computer rename and/or Domain Join - {1}
+	File rename operations - {2} - (See alert context for 'PendingFileRenameOperationsValue')
+    SCCM Client - {4}
+    Windows Update / Auto Update - {5}           
+          </Description>
+        </DisplayString>
+        <DisplayString ElementID="Server.Last.Patch.Applied.Monitor">
+          <Name>Server Last Patch Applied Monitor</Name>
+          <Description></Description>
+        </DisplayString>
+        <DisplayString ElementID="Server.Last.Patch.Applied.Monitor" SubElementID="GoodCondition">
+          <Name>Good Condition</Name>
+        </DisplayString>
+        <DisplayString ElementID="Server.Last.Patch.Applied.Monitor" SubElementID="BadCondition">
+          <Name>Bad Condition</Name>
+        </DisplayString>
+        <DisplayString ElementID="Server.Last.Patch.Applied.Monitor.AlertMessage">
+          <Name>PROACTIVE - Server NOT patched in past month</Name>
+          <Description>Server Last Patch Applied Monitor: Server NOT patched in past month
+Result: {0}
+Message: {1}</Description>
+        </DisplayString>
+        <DisplayString ElementID="Server.Uptime.Monitor">
+          <Name>Server Uptime Monitor</Name>
+          <Description></Description>
+        </DisplayString>
+        <DisplayString ElementID="Server.Uptime.Monitor" SubElementID="GoodCondition">
+          <Name>Good Condition</Name>
+        </DisplayString>
+        <DisplayString ElementID="Server.Uptime.Monitor" SubElementID="BadCondition">
+          <Name>Bad Condition</Name>
+        </DisplayString>
+        <DisplayString ElementID="Server.Uptime.Monitor.AlertMessage">
+          <Name>PROACTIVE - Server NOT rebooted in past month</Name>
+          <Description>Server Uptime Monitor: Server NOT rebooted in past month
+Result: {0}
+Message: {1}</Description>
+        </DisplayString>
+		
+        <DisplayString ElementID="Server.Pending.Restart.Script.Alert.Rule">
+          <Name>Server Pending Restart Alert Rule</Name>
+          <Description>The "Server Pending Restart Alert Rule" (disabled by default) is designed to detect when a computer or server is pending a restart. See 'Product Knowledge' tab for addition information.</Description>
+        </DisplayString>
+        <DisplayString ElementID="Server.Pending.Restart.Script.Alert.Rule.AlertMessage">
+          <Name>Rule Alert - Server pending restart detected</Name>
+          <Description>
+            Restart pending status:
+
+            Component Based Servicing - {0}
+
+            Computer rename and/or Domain Join - {1}
+
+            File rename operations - {2} - (See alert context for 'PendingFileRenameOperationsValue')
+
+            SCCM Client - {4}
+
+            Windows Update / Auto Update - {5}
+
+            Last boot up date / time - {6}
+          </Description>
+        </DisplayString>
+        <DisplayString ElementID="Server.Last.Patch.Applied.Script.Alert.Rule">
+          <Name>Server Last Patch Applied Script Alert Rule</Name>
+          <Description></Description>
+        </DisplayString>
+        <DisplayString ElementID="Server.Last.Patch.Applied.Script.Alert.Rule.AlertMessage">
+          <Name>Server Last.Patch Applied Script Alert Rule Triggered</Name>
+          <Description>Server Last.Patch.Applied Script Alert Rule: detected a bad condition
+Result: {0}
+Message: {1}</Description>
+        </DisplayString>
+        <DisplayString ElementID="Server.Uptime.Script.Alert.Rule">
+          <Name>Server Uptime Script Alert Rule</Name>
+          <Description></Description>
+        </DisplayString>
+        <DisplayString ElementID="Server.Uptime.Script.Alert.Rule.AlertMessage">
+          <Name>Server Uptime Script Alert Rule Triggered</Name>
+          <Description>Server Uptime Script Alert Rule: detected a bad condition
+Result: {0}
+Message: {1}</Description>
+        </DisplayString>
+
+        <DisplayString ElementID="Override.Server.Pending.Restart.Monitor.ComBSCheck">
+          <Name>NotUsed</Name>
+          <Description>Override for component check</Description>
+        </DisplayString>
+        <DisplayString ElementID="Override.Server.Pending.Restart.Monitor.ComRNDJCheck">
+          <Name>NotUsed</Name>
+          <Description>Override for component check</Description>
+        </DisplayString>
+        <DisplayString ElementID="Override.Server.Pending.Restart.Monitor.SCCMCheck">
+          <Name>NotUsed</Name>
+          <Description>Override for component check</Description>
+        </DisplayString>
+        <DisplayString ElementID="Override.Server.Pending.Restart.Monitor.WinUAUCheck">
+          <Name>NotUsed</Name>
+          <Description>Override for component check</Description>
+        </DisplayString>
+      </DisplayStrings>
+      <KnowledgeArticles>
+        <KnowledgeArticle ElementID="Proactive.Patch.Uptime.Reboot.Monitoring" Visible="true">
+          <MamlContent>
+            <maml:section xmlns:maml="http://schemas.microsoft.com/maml/2004/10">
+              <maml:title>Summary</maml:title>
+              <maml:para>This management pack provides monitoring and alerting for multiple conditions which determine a monitoring computer is pending a restart.</maml:para>
+              <maml:para>The following conditions are checked to determine whether there is a pending restart. Additionally, all condition detections (which are disabled by default) are separate from each other and can be enabled individually to meet the monitoring requirements.</maml:para>
+              <maml:para>
+                <maml:ui>Component Based Servicing (CBS)</maml:ui>
+              </maml:para>
+              <maml:para>
+                <maml:ui>Pending Computer Rename and/or Domain Join</maml:ui>
+              </maml:para>
+              <maml:para>
+                <maml:ui>Pending File Rename Operations</maml:ui>
+              </maml:para>
+              <maml:para>
+                <maml:ui>System Center Configuration Manager (SCCM) Client Operations</maml:ui>
+              </maml:para>
+              <maml:para>
+                <maml:ui>Windows Update / Auto Update</maml:ui>
+              </maml:para>
+              <maml:para>The management pack contains a monitor and a rule.</maml:para>
+              <maml:para>
+                <maml:ui>"Server Pending Restart Monitor": </maml:ui>This monitor is designed to detect the multiple conditions which result in a computer or server pending a restart. This monitor is enabled by default. See monitor properties - product knowledge for additional information.
+              </maml:para>
+              <maml:para>
+                <maml:ui>"Server Pending Restart Alert Rule": </maml:ui>This rule, which is disabled by default has the exact same condition detection behaviour as the "Server Pending Restart Monitor". This rule can be enabled as an alternative to the "Server Pending Restart Monitor" when the presentation of health state changes is not required. See rule properties - product knowledge for additional information.
+              </maml:para>
+            </maml:section>
+          </MamlContent>
+        </KnowledgeArticle>
+        <KnowledgeArticle ElementID="Server.Pending.Restart.Monitor" Visible="true">
+          <MamlContent>
+            <maml:section xmlns:maml="http://schemas.microsoft.com/maml/2004/10">
+              <maml:title>Summary</maml:title>
+              <maml:para>The "Server Pending Restart monitor" is designed to detect when a computer or server is pending a restart. This monitor is enabled by default.</maml:para>
+            </maml:section>
+            <maml:section xmlns:maml="http://schemas.microsoft.com/maml/2004/10">
+              <maml:title>Pending restart condition detection</maml:title>
+              <maml:para>The following conditions are checked to determine whether there is a pending restart:</maml:para>
+              <maml:para>
+                <maml:ui>Component Based Servicing (CBS): </maml:ui>Any component based servicing which has taken place on the target computer, and requires a restart, the following registry location will store a 'PendingRebbot' value - 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\'.
+              </maml:para>
+              <maml:para>
+                <maml:ui>Pending Computer Rename and/or Domain Join: </maml:ui>Computer rename operations are checked by evaluating the following registry locations and values - 'SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName\' and 'SYSTEM\CurrentControlSet\Control\ComputerName\ComputerName\'. Domain join operations are checked by evaluating the following registry location - 'SYSTEM\CurrentControlSet\Services\Netlogon' and the presence of 'JoinDomain' value.
+              </maml:para>
+              <maml:para>
+                <maml:ui>Pending File Rename Operations: </maml:ui>This condition detection is enabled by default within the monitor. File rename operations are checked using the following registry key and value - 'SYSTEM\CurrentControlSet\Control\Session Manager\', 'PendingFileRenameOperations'. File rename operations are triggered most commonly by anti-virus products when removing and updating virus definitions and / or .dat files.
+              </maml:para>
+              <maml:para>
+                <maml:ui>System Center Configuration Manager (SCCM): </maml:ui>This condition detection is enabled by default within the monitor. Any activity performed by the SCCM Client which results in a system pending restart is checked by executing a WMI query against the SCCM client ('ROOT\ccm\ClientSDK') on the target computer.
+              </maml:para>
+              <maml:para>
+                <maml:ui>Windows Update / Auto Update: </maml:ui>Post Windows Update / Auto update operations which result in the target computer requiring a restart are checked using the following registry key and value - 'SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\', 'RebootRequired'.
+              </maml:para>
+            </maml:section>
+            <maml:section xmlns:maml="http://schemas.microsoft.com/maml/2004/10">
+              <maml:title>Configuration</maml:title>
+              <maml:para>This monitor can be customized using overrides:</maml:para>
+              <maml:para>
+                <maml:ui>Enabled: </maml:ui>Use to enable/disable the "Server Pending Restart monitor". Default value for 'Enabled' is 'True'.
+              </maml:para>
+              <maml:para>
+                <maml:ui>IntervalSeconds: </maml:ui>How often (in seconds) the monitor will check for a pending restart condition. Default is 86400 seconds (24 hrs).
+              </maml:para>
+              <maml:para>
+                <maml:ui>Note - All condition detections are DISABLED by default. You must enable the required condition detections via override.</maml:ui>
+              </maml:para>
+              <maml:para>
+                <maml:ui>SCCMCheck: </maml:ui>The condition detection of SCCM client activities which result in a pending restart status. Default is 'False'.
+              </maml:para>
+              <maml:para>
+                <maml:ui>FileRenameCheck: </maml:ui>The condition detection of file rename operations which result in a pending restart status. Default is 'False'.
+              </maml:para>
+              <maml:para>
+                <maml:ui>ComBSCheck: </maml:ui>The condition detection of Component Based Servicing operations which result in a pending restart status. Default is 'False'.
+              </maml:para>
+              <maml:para>
+                <maml:ui>ComRNDJCheck: </maml:ui>The condition detection of computer rename and or Domain join operations which result in a pending restart status. Default is 'False'.
+              </maml:para>
+              <maml:para>
+                <maml:ui>WinUAUCheck: </maml:ui>The condition detection of Windows Update Automatic Update operations which result in a pending restart status. Default is 'False'.
+              </maml:para>
+              <maml:para>
+                <maml:ui>TimeoutSeconds: </maml:ui>Timeout in seconds for the PowerShell script inside the monitor. Default is 120 seconds.
+              </maml:para>
+            </maml:section>
+            <maml:section xmlns:maml="http://schemas.microsoft.com/maml/2004/10">
+              <maml:title>Alerting behaviour</maml:title>
+              <maml:para>A warning alert is generated if any of the condition detections returns 'True'. This is then reflected in the 'Is Reboot Pending' value within the monitor. The monitor is configured to change the 'Configuration' health state of the target Windows Server Operating System. When the 'Is Reboot Pending' value equals 'False', the monitor will detect the healthy condition and return to a healthy state.</maml:para>
+            </maml:section>
+          </MamlContent>
+        </KnowledgeArticle>
+        <KnowledgeArticle ElementID="Server.Pending.Restart.Script.Alert.Rule" Visible="true">
+          <MamlContent>
+            <maml:section xmlns:maml="http://schemas.microsoft.com/maml/2004/10">
+              <maml:title>Summary</maml:title>
+              <maml:para>The "Server Pending Restart Alert Rule" is designed to detect when a computer or server is pending a restart. This rule, which is disabled by default has the exact same condition detection behaviour as the "Server Pending Restart Monitor". This rule can be enabled as an alternative to the "Server Pending Restart Monitor" when the presentation of health state changes are not required.</maml:para>
+            </maml:section>
+            <maml:section xmlns:maml="http://schemas.microsoft.com/maml/2004/10">
+              <maml:title>Pending restart condition detection</maml:title>
+              <maml:para>The following conditions are checked to determine whether there is a pending restart:</maml:para>
+              <maml:para>
+                <maml:ui>Component Based Servicing (CBS): </maml:ui>Any component based servicing which has taken place on the target computer, and requires a restart, the following registry location will store a 'PendingRebbot' value - 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\'.
+              </maml:para>
+              <maml:para>
+                <maml:ui>Pending Computer Rename and/or Domain Join: </maml:ui>Computer rename operations are checked by evaluating the following registry locations and values - 'SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName\' and 'SYSTEM\CurrentControlSet\Control\ComputerName\ComputerName\'. Domain join operations are checked by evaluating the following registry location - 'SYSTEM\CurrentControlSet\Services\Netlogon' and the presence of 'JoinDomain' value.
+              </maml:para>
+              <maml:para>
+                <maml:ui>Pending File Rename Operations: </maml:ui>This condition detection is enabled by default within the rule. File rename operations are checked using the following registry key and value - 'SYSTEM\CurrentControlSet\Control\Session Manager\', 'PendingFileRenameOperations'. File rename operations are triggered most commonly by anti-virus products when removing and updating virus definitions and / or .dat files.
+              </maml:para>
+              <maml:para>
+                <maml:ui>System Center Configuration Manager (SCCM): </maml:ui>This condition detection is enabled by default within the rule. Any activity performed by the SCCM Client which results in a system pending restart is checked by executing a WMI query against the SCCM client ('ROOT\ccm\ClientSDK') on the target computer.
+              </maml:para>
+              <maml:para>
+                <maml:ui>Windows Update / Auto Update: </maml:ui>Post Windows Update / Auto update operations which result in the target computer requiring a restart are checked using the following registry key and value - 'SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\', 'RebootRequired'.
+              </maml:para>
+            </maml:section>
+            <maml:section xmlns:maml="http://schemas.microsoft.com/maml/2004/10">
+              <maml:title>Configuration</maml:title>
+              <maml:para>This rule can be customized using overrides:</maml:para>
+              <maml:para>
+                <maml:ui>Enabled: </maml:ui>Use to enable/disable the "Server Pending Restart Alert Rule". Default value for 'Enabled' is 'False'.
+              </maml:para>
+              <maml:para>
+                <maml:ui>IntervalSeconds: </maml:ui>How often (in seconds) the rule will check for a pending restart condition. Default is 86400 seconds (24 hrs).
+              </maml:para>
+              <maml:para>
+                <maml:ui>Note - All condition detections are DISABLED by default. You must enable the required condition detections via override.</maml:ui>
+              </maml:para>
+              <maml:para>
+                <maml:ui>SCCMCheck: </maml:ui>The condition detection of SCCM client activities which result in a pending restart status. Default is 'False'.
+              </maml:para>
+              <maml:para>
+                <maml:ui>FileRenameCheck: </maml:ui>The condition detection of file rename operations which result in a pending restart status. Default is 'False'.
+              </maml:para>
+              <maml:para>
+                <maml:ui>ComBSCheck: </maml:ui>The condition detection of Component Based Servicing operations which result in a pending restart status. Default is 'False'.
+              </maml:para>
+              <maml:para>
+                <maml:ui>ComRNDJCheck: </maml:ui>The condition detection of computer rename and or Domain join operations which result in a pending restart status. Default is 'False'.
+              </maml:para>
+              <maml:para>
+                <maml:ui>WinUAUCheck: </maml:ui>The condition detection of Windows Update Automatic Update operations which result in a pending restart status. Default is 'False'.
+              </maml:para>
+              <maml:para>
+                <maml:ui>TimeoutSeconds: </maml:ui>Timeout in seconds for the PowerShell script inside the rule. Default is 120 seconds.
+              </maml:para>
+            </maml:section>
+            <maml:section xmlns:maml="http://schemas.microsoft.com/maml/2004/10">
+              <maml:title>Alerting behaviour</maml:title>
+              <maml:para>A warning alert is generated if any of the condition detections return 'True'. This is then reflected in the 'Is Reboot Pending' value within the rule. If an alert generated by the rule is closed, a new alert will be generated when the rule checks for the 'Is Reboot Pending' value on it's next set interval. </maml:para>
+            </maml:section>
+          </MamlContent>
+        </KnowledgeArticle>
+      </KnowledgeArticles>
+    </LanguagePack>
+  </LanguagePacks>
+</ManagementPack>
