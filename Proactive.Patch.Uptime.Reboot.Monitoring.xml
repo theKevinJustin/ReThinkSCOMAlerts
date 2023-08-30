@@ -2,7 +2,7 @@
   <Manifest>
     <Identity>
       <ID>Proactive.Patch.Uptime.Reboot.Monitoring</ID>
-      <Version>10.19.10407.3</Version>
+      <Version>10.19.10407.5</Version>
     </Identity>
     <Name>Proactive Patch Uptime Reboot Monitoring</Name>
 	<References>
@@ -65,7 +65,7 @@
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
-                <ScriptName>Server.Pending.Restart.Monitor.DataSource.ps1</ScriptName>
+                <ScriptName>Server.Pending.Restart.Monitor.DataSource.v1019104075.ps1</ScriptName>
                 <ScriptBody>
                   #=================================================================================
                   #  Describe Script Here
@@ -89,7 +89,7 @@
                   # Constants section - modify stuff here:
                   #=================================================================================
                   # Assign script name variable for use in event logging.
-                  $ScriptName = "Server.Pending.Restart.Monitor.DataSource.ps1"
+                  $ScriptName = "Server.Pending.Restart.Monitor.DataSource.v1019104075.ps1"
                   $EventID = "560"
                   #=================================================================================
                   # Starting Script section - All scripts get this
@@ -308,7 +308,7 @@
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
-                <ScriptName>Server.Last.Patch.Applied.Monitor.DS.ps1</ScriptName>
+                <ScriptName>Server.Last.Patch.Applied.Monitor.DS.v1019104075.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  PowerShell script to calculate last patch applied is over x days old
@@ -329,7 +329,7 @@ param([int]$NumberOfDays)
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.  
-$ScriptName = "Server.Last.Patch.Applied.Monitor.DS.ps1"
+$ScriptName = "Server.Last.Patch.Applied.Monitor.DS.v1019104075.ps1"
 $EventID = "561"
 #=================================================================================
 
@@ -462,7 +462,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
-                <ScriptName>Server.Uptime.Monitor.DS.ps1</ScriptName>
+                <ScriptName>Server.Uptime.Monitor.DS.v1019104075.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Server Uptime monitor with variable NumberofDays to determine if server NOT being rebooted monthly for patches
@@ -481,7 +481,7 @@ param([int]$NumberOfDays)
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.  
-$ScriptName = "Server.Uptime.Monitor.DS.ps1"
+$ScriptName = "Server.Uptime.Monitor.DS.v1019104075.ps1"
 $EventID = "562"
 #=================================================================================
 
@@ -618,7 +618,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagProbe">
-                <ScriptName>Server.Pending.Restart.Script.Alert.Rule.Datasource.ps1</ScriptName>
+                <ScriptName>Server.Pending.Restart.Script.Alert.Rule.Datasource.v1019104075.ps1</ScriptName>
                 <ScriptBody>
                   #=================================================================================
                   #  Describe Script Here
@@ -642,7 +642,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
                   # Constants section - modify stuff here:
                   #=================================================================================
                   # Assign script name variable for use in event logging.
-                  $ScriptName = "Server.Pending.Restart.Alert.Rule.DataSource.ps1"
+                  $ScriptName = "Server.Pending.Restart.Alert.Rule.DataSource.v1019104075.ps1"
                   $EventID = "1234"
                   #=================================================================================
                   # Starting Script section - All scripts get this
@@ -856,7 +856,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagProbe">
-                <ScriptName>Server.Last.Patch.Applied.Script.Alert.Rule.Datasource.ps1</ScriptName>
+                <ScriptName>Server.Last.Patch.Applied.Script.Alert.Rule.Datasource.v1019104075.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  PowerShell script to calculate last patch applied is over x days old
@@ -877,7 +877,7 @@ param([int]$NumberOfDays)
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.  
-$ScriptName = "Server.Last.Patch.Applied.Monitor.DS.ps1"
+$ScriptName = "Server.Last.Patch.Applied.Monitor.DS.v1019104075.ps1"
 $EventID = "561"
 #=================================================================================
 
@@ -1005,7 +1005,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagProbe">
-                <ScriptName>Server.Uptime.Script.Alert.Rule.Datasource.ps1</ScriptName>
+                <ScriptName>Server.Uptime.Script.Alert.Rule.Datasource.v1019104075.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Server Uptime monitor with variable NumberofDays to determine if server NOT being rebooted monthly for patches
@@ -1024,7 +1024,7 @@ param([int]$NumberOfDays)
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.  
-$ScriptName = "Server.Uptime.Monitor.DS.ps1"
+$ScriptName = "Server.Uptime.Monitor.DS.v1019104075.ps1"
 $EventID = "562"
 #=================================================================================
 
@@ -1443,7 +1443,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
             <IntervalSeconds>3600</IntervalSeconds>
             <SyncTime></SyncTime>
 		    <NumberOfDays>45</NumberOfDays>			
-            <TimeoutSeconds>120</TimeoutSeconds>
+            <TimeoutSeconds>180</TimeoutSeconds>
           </DataSource>
         </DataSources>
         <ConditionDetection ID="CD" TypeID="System!System.ExpressionFilter">
@@ -1545,7 +1545,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
           <!-- HealthState = Warning or Error -->
         </OperationalStates>
         <Configuration>
-          <IntervalSeconds>86400</IntervalSeconds>
+          <IntervalSeconds>7200</IntervalSeconds>
           <SyncTime />
           <TimeoutSeconds>120</TimeoutSeconds>
 		  <ComputerName>$Target/Host/Property[Type="Windows!Microsoft.Windows.Computer"]/NetworkName$</ComputerName> 
@@ -1573,11 +1573,11 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
           <OperationalState ID="BadCondition" MonitorTypeStateID="BadCondition" HealthState="Warning" />  <!-- HealthState = Warning or Error -->
         </OperationalStates>
         <Configuration>
-          <IntervalSeconds>86400</IntervalSeconds>
+          <IntervalSeconds>10800</IntervalSeconds>
 		  <SyncTime></SyncTime>
 		  <NumberOfDays>45</NumberOfDays>  <!-- Just an example of some string data to pass into the script -->
 		  <ComputerName>$Target/Host/Property[Type="Windows!Microsoft.Windows.Computer"]/NetworkName$</ComputerName>  <!-- Might need to change the number of Host entries in this line depending on your target class -->
-          <TimeoutSeconds>120</TimeoutSeconds>
+          <TimeoutSeconds>180</TimeoutSeconds>
 		  <MatchCount>1</MatchCount>  <!-- This is the number of consecutive matches that must be met before the monitor will change state.  Also a good example of passing in Integer data. -->
         </Configuration>
       </UnitMonitor>
@@ -1598,7 +1598,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
           <OperationalState ID="BadCondition" MonitorTypeStateID="BadCondition" HealthState="Warning" />  <!-- HealthState = Warning or Error -->
         </OperationalStates>
         <Configuration>
-          <IntervalSeconds>86400</IntervalSeconds>
+          <IntervalSeconds>10800</IntervalSeconds>
 		  <SyncTime></SyncTime>
 		  <NumberOfDays>45</NumberOfDays>  <!-- Just an example of some string data to pass into the script -->
 		  <ComputerName>$Target/Host/Property[Type="Windows!Microsoft.Windows.Computer"]/NetworkName$</ComputerName>  <!-- Might need to change the number of Host entries in this line depending on your target class -->
